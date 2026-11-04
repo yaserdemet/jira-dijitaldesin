@@ -35,7 +35,6 @@ Tarayıcıda `http://127.0.0.1:3000` adresini açın ve **Örnek çalışma alan
 
 Deneme modunda gerçek hesap açılmaz, e-posta gönderilmez. Kayıtlar localStorage, dosyalar IndexedDB içinde yalnızca kullanılan tarayıcıda tutulur. Oturumu kapatmak verileri silmez. Deneme kullanıcısı menüsü rol senaryolarını göstermek içindir ve güvenlik sınırı değildir. Deneme modu üretim derlemesinde kapalıdır; bu alana gerçek müşteri verisi girmeyin.
 
-pnpm tercih edilirse `pnpm install --store-dir .pnpm-store --config.node-linker=hoisted --config.package-import-method=copy` kullanılabilir. Çalışma alanındaki kilit dosyası pnpm ile oluşturuldu.
 
 ## Gerçek ekip kullanımını açma
 
