@@ -1,11 +1,12 @@
+import {taskProgress,workflowState} from './workflow';
 import { z } from 'zod';
 export const categories = ['Grafik İşlemleri','Teknik İşlemler','Diğer Talepler'] as const;
 export const statuses = ['Yeni','Atandı','İşlemde','Bilgi Bekliyor','Onay Bekliyor','Revize İstendi','Tamamlandı','İptal'] as const;
 export type Category = typeof categories[number];
 export type Status = typeof statuses[number];
 export type Profile = {id:string;name:string;email:string;role:'super_admin'|'employee';active:boolean;team:string};
-export type Task = {id:string;number:number;title:string;description:string;category:Category;brand:string;priority:'Normal'|'Yüksek'|'Acil';status:Status;creator_id:string;assignee_id:string|null;due_date:string;created_at:string;updated_at:string;completed_at:string|null;revision_count:number};
-export type Message = {id:string;task_id:string;author_id:string;body:string;kind:'comment'|'revision'|'delivery';created_at:string};
+export type Task = {id:string;number:number;title:string;description:string;category:Category;brand:string;priority:'Normal'|'Yüksek'|'Acil';status:Status;creator_id:string;assignee_id:string|null;due_date:string;created_at:string;updated_at:string;completed_at:string|null;revision_count:number;progress?:number;issue_description?:string};
+export type Message = {id:string;task_id:string;author_id:string;body:string;kind:'comment'|'revision'|'delivery';created_at:string;recipient_id?:string|null;parent_id?:string|null};
 export type Attachment = {id:string;task_id:string;uploader_id:string;name:string;size:number;mime:string;path:string;kind:'brief'|'delivery';created_at:string};
 export type Audit = {id:string;actor_id:string|null;action:string;entity_id:string;details:string;created_at:string};
 export type TaskEvent = {id:string;actor_id:string|null;task_id:string;action:string;details:string;created_at:string};
@@ -22,4 +23,4 @@ export function validateFile(file:Pick<File,'size'|'type'|'name'>){
   if(!/\.(pdf|png|jpe?g|webp)$/i.test(file.name))throw new Error('Dosya uzantısı desteklenmiyor.');
 }
 export function csvCell(value:unknown){let s=String(value??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"'}
-export function reportCsv(tasks:Task[],profiles:Profile[]){return '\uFEFF'+[['İş No','Başlık','Bölüm','Müşteri','Durum','Sorumlu','Teslim Tarihi','Revize'],...tasks.map(t=>[t.number,t.title,t.category,t.brand,t.status,profiles.find(p=>p.id===t.assignee_id)?.name??'Atanmadı',t.due_date,t.revision_count])].map(r=>r.map(csvCell).join(';')).join('\r\n')}
+export function reportCsv(tasks:Task[],profiles:Profile[]){return '\uFEFF'+[['İş No','Başlık','Bölüm','Müşteri','Durum','İlerleme (%)','Sorumlu','Teslim Tarihi','Revize'],...tasks.map(t=>[t.number,t.title,t.category,t.brand,workflowState(t),taskProgress(t),profiles.find(p=>p.id===t.assignee_id)?.name??'Atanmadı',t.due_date,t.revision_count])].map(r=>r.map(csvCell).join(';')).join('\r\n')}
