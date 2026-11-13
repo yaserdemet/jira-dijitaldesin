@@ -4,13 +4,14 @@ import { Activity, ArrowDownToLine, ArrowLeft, ArrowUpRight, BarChart3, Bell, Ch
 import { Attachment, Audit, Category, Data, Message, Profile, Task, TaskInput, canApprove, canEdit, categories, isOverdue, reportCsv, statuses, taskSchema, validateFile } from '@/lib/domain';
 import { supabase, demoAllowed } from '@/lib/client';
 import { getDemoFile, putDemoFile, readDemo, saveDemo } from '@/lib/demo';
+import { designSizes, requestForms } from './request-forms';
 import WorkflowScreen from './workflow-screen';
 import {Guide,Notice,taskProgress,workflowState} from '@/lib/workflow';
 import type { Session } from '@supabase/supabase-js';
 const empty:Data={profiles:[],tasks:[],messages:[],attachments:[],logs:[],events:[]};
 const initials=(name:string)=>name.split(' ').map(s=>s[0]).slice(0,2).join('').toLocaleUpperCase('tr');
 const formatDate=(s:string)=>s?new Date(s.length===10?s+'T12:00:00+03:00':s).toLocaleDateString('tr-TR',{timeZone:'Europe/Istanbul',day:'numeric',month:'short',...(s.length>10?{hour:'2-digit',minute:'2-digit'}:{})}):'—';
-const catIcon=(c:string)=>c==='Grafik İşlemleri'?Palette:c==='Teknik İşlemler'?Wrench:FolderOpen;
+const maxRequestFiles=10;
 const statusClass=(s:string)=>s==='Tamamlandı'?'green':s==='Revize İstendi'?'red':s==='Onay Bekliyor'?'purple':s==='İşlemde'?'blue':s==='Bilgi Bekliyor'?'amber':'neutral';
 const uid=()=>crypto.randomUUID();
 function Avatar({person,small=false}:{person?:Profile;small?:boolean}){return <span className={`avatar ${small?'small':''} tone-${person?person.name.length%5:0}`} title={person?.name??'Atanmadı'}>{person?initials(person.name):'—'}</span>}
@@ -21,8 +22,12 @@ export default function Workspace(){
  const [creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[toast,setToast]=useState(''),[invite,setInvite]=useState(false),[pwTarget,setPwTarget]=useState<Profile|null>(null);
  const demoData=useRef<Data>(empty);
  const [notices,setNotices]=useState<Notice[]>([]),[guides,setGuides]=useState<Guide[]>([]);
- const createCategory=useRef<Category>('Teknik İşlemler');
- useEffect(()=>{const sync=()=>setCreating(location.pathname==='/yeni');window.addEventListener('popstate',sync);sync();return()=>window.removeEventListener('popstate',sync)},[]);
+ const [createCategory,setCreateCategory]=useState<Category>('Teknik İşlemler');
+ useEffect(()=>{const sync=()=>{
+  const category=categories.find(value=>value===new URLSearchParams(location.search).get('kategori'));
+  setCreateCategory(category??'Teknik İşlemler');
+  setCreating(location.pathname==='/yeni');
+ };window.addEventListener('popstate',sync);sync();return()=>window.removeEventListener('popstate',sync)},[]);
  function navigate(path:string){history.pushState(null,'',path);window.dispatchEvent(new PopStateEvent('popstate'))}
  function demoNotice(recipient:string|null,taskId:string,body:string,messageId:string|null=null){if(!recipient||recipient===person?.id)return;setNotices(old=>{const next=[{id:uid(),recipient_id:recipient,task_id:taskId,message_id:messageId,body,created_at:new Date().toISOString(),read_at:null},...old];localStorage.setItem('akis-demo-notices',JSON.stringify(next));return next})}
  const notify=(s:string)=>{setToast(s);setTimeout(()=>setToast(''),4500)};
@@ -55,7 +60,9 @@ export default function Workspace(){
  function log(action:string,entity_id:string,details=''):Audit{return{id:uid(),actor_id:person!.id,action,entity_id,details,created_at:new Date().toISOString()}}
  function startDemo(){try{setNotices(JSON.parse(localStorage.getItem('akis-demo-notices')??'[]'));const d=readDemo();setGuides(JSON.parse(localStorage.getItem('akis-demo-guides')??JSON.stringify([{id:'guide-request',title:'İyi bir talep nasıl açılır?',body:'1. İlgili bölümü seçin.\n2. Beklentiyi, müşteri adını ve teslim tarihini yazın.\n3. Sorumluyu seçip referans dosyalarını ekleyin.\n4. Talebi oluşturun; gelişmeleri aynı işin altında paylaşın.',author_id:d.profiles[0].id,created_at:new Date().toISOString()},{id:'guide-delivery',title:'Dosya teslimi ve revize',body:'1. Talep ayrıntısını açın.\n2. Teslim dosyası ekle düğmesinden çıktıyı yükleyin.\n3. Çözüm / teslim açıklaması paylaşın.\n4. Gerekiyorsa talep sahibi gerekçesiyle revize isteyebilir; önceki dosyalar korunur.',author_id:d.profiles[0].id,created_at:new Date().toISOString()}])));demoData.current=d;setData(d);setPerson(d.profiles[0]);setDemo(true)}catch(e){fail(e)}}
  async function createTask(input:TaskInput,files:File[]){
-  const clean=taskSchema.parse(input);files.forEach(validateFile);
+  const clean=taskSchema.parse(input);
+  if(files.length>maxRequestFiles)throw new Error('Bir talebe en fazla 10 dosya ekleyebilirsiniz.');
+  files.forEach(validateFile);
   let task:Task;
   if(demo){const now=new Date().toISOString();task={...clean,id:uid(),number:Math.max(1000,...data.tasks.map(t=>t.number))+1,status:clean.assignee_id?'Atandı':'Yeni',creator_id:person!.id,created_at:now,updated_at:now,completed_at:null,revision_count:0};commit({...demoData.current,tasks:[task,...demoData.current.tasks],logs:[log('Talep oluşturuldu',task.id,task.title),...demoData.current.logs]})}
   else {const {data:t,error}=await supabase!.from('tasks').insert({...clean,creator_id:person!.id,status:clean.assignee_id?'Atandı':'Yeni'}).select().single();if(error)throw error;task=t}
@@ -96,8 +103,8 @@ export default function Workspace(){
  async function changePassword(target:Profile,password:string){if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');if(!demo&&target.id===person?.id){const {error}=await supabase!.auth.updateUser({password});if(error)throw error;notify('Şifren güncellendi.');setPwTarget(null);return}await adminAction({action:'password',id:target.id,password})}
  if(!ready)return <div className="loading"><LoaderCircle className="spin"/> Çalışma alanı açılıyor…</div>;
  if(!person)return <Login busy={busy} configured={!!supabase} allowDemo={demoAllowed} onDemo={startDemo} error={error} run={run} session={session} onLogout={()=>run(async()=>{await supabase?.auth.signOut();setSession(null);setError('')})}/>;
- return <>{!creating&&<WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>{createCategory.current=c;setCreating(true);navigate('/yeni')}} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onInvite={()=>setInvite(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))}/>}
- {creating&&<CreateModal profiles={data.profiles} category={createCategory.current} busy={busy} onClose={()=>{setCreating(false);navigate('/')}} onSubmit={(input,files)=>run(()=>createTask(input,files))}/>}
+ return <>{!creating&&<WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>navigate('/yeni?kategori='+encodeURIComponent(c))} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onInvite={()=>setInvite(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))}/>}
+ {creating&&<CreateModal key={createCategory} profiles={data.profiles} category={createCategory} busy={busy} onClose={()=>{setCreating(false);navigate('/')}} onSubmit={(input,files)=>run(()=>createTask(input,files))}/>}
  {invite&&<InviteModal busy={busy} demo={demo} onClose={()=>setInvite(false)} onSubmit={b=>run(()=>adminAction(b))}/>}
  {pwTarget&&<PasswordModal busy={busy} target={pwTarget} self={pwTarget.id===person.id} onClose={()=>setPwTarget(null)} onSubmit={pw=>run(()=>changePassword(pwTarget,pw))}/>}
  {error&&(creating||invite||pwTarget)&&<div className="modal-error" role="alert">{error}<button onClick={()=>setError('')} aria-label="Hatayı kapat"><X size={16}/></button></div>}</>;
@@ -109,8 +116,82 @@ function Login({busy,configured,allowDemo,onDemo,error,run,session,onLogout}:{bu
 }
 function Modal({children,onClose,wide=false,page=false}:{children:React.ReactNode;onClose:()=>void;wide?:boolean;page?:boolean}){const ref=useRef<HTMLDivElement>(null);const closeRef=useRef(onClose);closeRef.current=onClose;useEffect(()=>{const previous=document.activeElement as HTMLElement;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';ref.current?.focus();function key(e:KeyboardEvent){if(e.key==='Escape')closeRef.current();if(e.key==='Tab'){const items=Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]')??[]);const first=items[0],last=items.at(-1);if(!first)return;if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last?.focus()}else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===ref.current)){e.preventDefault();first.focus()}}}document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);previous?.focus()}},[]);return <div className={page?"fullpage-backdrop":"modal-backdrop"} onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div ref={ref} tabIndex={-1} role={page?undefined:"dialog"} aria-modal={page?undefined:true} aria-label="Talep ve ekip işlemleri" className={`modal ${wide?'wide':''}`}>{children}</div></div>}
 function CreateModal({profiles,category,busy,onClose,onSubmit}:{profiles:Profile[];category:Category;busy:boolean;onClose:()=>void;onSubmit:(input:TaskInput,files:File[])=>void}){
- const [input,setInput]=useState<TaskInput>({title:'',description:'',category,brand:'',priority:'Normal',assignee_id:null,due_date:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Istanbul'})}),[files,setFiles]=useState<File[]>([]),[localError,setLocalError]=useState('');
- return <Modal page onClose={busy?()=>{}:onClose}><div className="modal-heading"><div><div className="eyebrow">BİRLİKTE BAŞLAYALIM</div><h2>Yeni talep oluştur</h2></div><button className="icon-btn" disabled={busy} aria-label="Kapat" onClick={onClose}><X size={20}/></button></div><form onSubmit={e=>{e.preventDefault();const result=taskSchema.safeParse(input);if(!result.success){setLocalError(result.error.issues[0].message);return}onSubmit(result.data,files)}}><div className="modal-body"><div className="category-options">{categories.map(c=>{const Icon=catIcon(c);return <button type="button" className={input.category===c?'active':''} key={c} onClick={()=>setInput({...input,category:c})}><Icon size={18}/>{c}</button>})}</div><label>Talep başlığı<input autoFocus required minLength={3} maxLength={180} value={input.title} placeholder="Örn. Kasım kampanyası reklam tasarımları" onChange={e=>setInput({...input,title:e.target.value})}/></label><label>Açıklama / brief<textarea required minLength={5} maxLength={10000} rows={4} value={input.description} placeholder="Ne yapılmasını istiyorsun? Boyutları, beklentileri ve gerekli bilgileri ekle." onChange={e=>setInput({...input,description:e.target.value})}/></label><div className="form-grid"><label>Müşteri / marka<input required maxLength={100} value={input.brand} placeholder="Marka adı veya İç Ekip" onChange={e=>setInput({...input,brand:e.target.value})}/></label><label>Sorumlu<select value={input.assignee_id??''} onChange={e=>setInput({...input,assignee_id:e.target.value||null})}><option value="">Henüz atanmadı</option>{profiles.filter(p=>p.active).map(p=><option key={p.id} value={p.id}>{p.name} · {p.team}</option>)}</select></label><label>Teslim tarihi<input required type="date" value={input.due_date} onChange={e=>setInput({...input,due_date:e.target.value})}/></label><label>Öncelik<select value={input.priority} onChange={e=>setInput({...input,priority:e.target.value as TaskInput['priority']})}>{['Normal','Yüksek','Acil'].map(s=><option key={s}>{s}</option>)}</select></label></div><label className="upload-zone"><Paperclip size={22}/><b>Referans dosyalarını ekle</b><span>PDF, PNG, JPG, WebP · dosya başına en fazla 20 MB</span><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e=>{try{const f=Array.from(e.target.files??[]);f.forEach(validateFile);setFiles([...files,...f]);setLocalError('')}catch(err){setLocalError((err as Error).message)}e.target.value=''}}/></label>{files.map((f,i)=><div className="picked-file" key={i}><FileText size={15}/>{f.name}<button type="button" className="icon-btn" aria-label={`${f.name} dosyasını kaldır`} onClick={()=>setFiles(files.filter((_,j)=>j!==i))}><X size={14}/></button></div>)}{localError&&<p className="field-error" role="alert">{localError}</p>}</div><div className="modal-footer"><span>İş, tüm ekip tarafından görülebilir.</span><button type="submit" className="button primary" disabled={busy}><Plus size={17}/>{busy?'Oluşturuluyor…':'Talebi oluştur'}</button></div></form></Modal>
+ const [input,setInput]=useState<TaskInput>({title:'',description:'',category,brand:'',priority:'Normal',assignee_id:null,due_date:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Istanbul'})});
+ const [files,setFiles]=useState<File[]>([]);
+ const [localError,setLocalError]=useState('');
+ const [requestTypes,setRequestTypes]=useState<string[]>([]);
+ const [sizes,setSizes]=useState<string[]>([]);
+ const [customSize,setCustomSize]=useState('');
+ const design=category==='Grafik İşlemleri';
+ const [fields,setFields]=useState<Record<string,string>>({});
+ const brief=requestForms[category];
+ const visibleFields=brief.fields.filter(field=>!field.when||requestTypes.includes(field.when));
+ function submit(e:React.FormEvent<HTMLFormElement>){
+  e.preventDefault();
+  if(!requestTypes.length||visibleFields.some(field=>field.required&&!fields[field.label]?.trim())){
+   setLocalError('Talep türünü ve zorunlu alanları doldurun.');
+   return;
+  }
+  const details=visibleFields.flatMap(field=>{
+   const value=fields[field.label]?.trim();
+   return value?[field.label+': '+value]:[];
+  });
+  const dimensions=[...sizes,customSize.trim()].filter(Boolean);
+  if(design&&!dimensions.length){setLocalError('Bir yayın ölçüsü seçin veya özel ölçü girin.');return;}
+  if(files.length>maxRequestFiles){setLocalError('Bir talebe en fazla 10 dosya ekleyebilirsiniz.');return;}
+  if(design)details.unshift('Yayın alanı ve ölçüler: '+dimensions.join(', '));
+  const description=['Talep türü: '+requestTypes.join(', '),...details].join('\n\n');
+  if(description.length>10000){setLocalError('Talep ayrıntıları toplamda 10.000 karakteri aşmamalı.');return;}
+  const result=taskSchema.safeParse({...input,description});
+  if(!result.success){setLocalError(result.error.issues[0].message);return;}
+  onSubmit(result.data,files);
+ }
+ return <Modal page onClose={busy?()=>{}:onClose}>
+  <div className="modal-heading">
+   <h2>{brief.heading}</h2>
+   <button className="icon-btn" disabled={busy} aria-label="Kapat" onClick={onClose}><X size={20}/></button>
+  </div>
+  <form onSubmit={submit}><div className="modal-body">
+   {design?<fieldset className="request-options">
+    <legend>Talep türleri</legend>
+    <div className="request-option-grid">{brief.types.map(type=><label className="request-option" key={type}><input type="checkbox" checked={requestTypes.includes(type)} onChange={e=>{
+     setRequestTypes(e.target.checked?[...requestTypes,type]:requestTypes.filter(value=>value!==type));
+    }}/>{type}</label>)}</div>
+   </fieldset>:<label>Talep türü<select required value={requestTypes[0]??''} onChange={e=>setRequestTypes(e.target.value?[e.target.value]:[])}>
+    <option value="">Seçin</option>{brief.types.map(type=><option key={type}>{type}</option>)}
+   </select></label>}
+   <label>Talep başlığı<input autoFocus required minLength={3} maxLength={180} value={input.title} placeholder={brief.titleExample} onChange={e=>setInput({...input,title:e.target.value})}/></label>
+   {design&&<fieldset className="request-options">
+    <legend>Yayın alanı ve ölçüler</legend>
+    <div className="request-option-grid">{designSizes.map(size=><label className="request-option" key={size}><input type="checkbox" checked={sizes.includes(size)} onChange={e=>{
+     setSizes(e.target.checked?[...sizes,size]:sizes.filter(value=>value!==size));
+    }}/>{size}</label>)}</div>
+    <label className="request-custom-size">Özel ölçü<input maxLength={500} placeholder="Örn. ana sayfa masaüstü banner · 1920 × 880 px" value={customSize} onChange={e=>setCustomSize(e.target.value)}/></label>
+   </fieldset>}
+   {visibleFields.map(field=><label key={field.label}>{field.label}{!field.required&&' (isteğe bağlı)'}
+    {field.options?<select required={field.required} value={fields[field.label]??''} onChange={e=>setFields({...fields,[field.label]:e.target.value})}>
+     <option value="">Seçin</option>{field.options.map(option=><option key={option}>{option}</option>)}
+    </select>:field.multiline?<textarea required={field.required} maxLength={2500} rows={3} placeholder={field.example} value={fields[field.label]??''} onChange={e=>setFields({...fields,[field.label]:e.target.value})}/>:<input required={field.required} maxLength={500} placeholder={field.example} value={fields[field.label]??''} onChange={e=>setFields({...fields,[field.label]:e.target.value})}/>}
+   </label>)}
+<div className="form-grid"><label>Müşteri / marka<input required maxLength={100} value={input.brand} placeholder="Marka adı veya İç Ekip" onChange={e=>setInput({...input,brand:e.target.value})}/></label><label>Sorumlu<select value={input.assignee_id??''} onChange={e=>setInput({...input,assignee_id:e.target.value||null})}><option value="">Henüz atanmadı</option>{profiles.filter(p=>p.active).map(p=><option key={p.id} value={p.id}>{p.name} · {p.team}</option>)}</select></label><label>Teslim tarihi<input required type="date" value={input.due_date} onChange={e=>setInput({...input,due_date:e.target.value})}/></label><label>Öncelik<select value={input.priority} onChange={e=>setInput({...input,priority:e.target.value as TaskInput['priority']})}>{['Normal','Yüksek','Acil'].map(s=><option key={s}>{s}</option>)}</select></label></div><fieldset className="request-files">
+ <legend>{brief.attachmentLabel}</legend>
+ <small>{files.length} / {maxRequestFiles} dosya · PDF, PNG, JPG, WebP · dosya başına en fazla 20 MB</small>
+ {files.map((file,index)=><div className="picked-file" key={index}>
+  <FileText size={15}/><span>{index+1}. dosya · {file.name}</span>
+  <button type="button" className="icon-btn" disabled={busy} aria-label={`${index+1}. dosyayı kaldır`} onClick={()=>setFiles(current=>current.filter((_,i)=>i!==index))}><X size={14}/></button>
+ </div>)}
+ {files.length<maxRequestFiles&&<label className="upload-zone" key={files.length}>
+  <Paperclip size={22}/><b>{files.length+1}. {design?'görsel / dosya':'dosya'} ekle</b>
+  <input type="file" disabled={busy} accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e=>{
+   const file=e.target.files?.[0];
+   if(!file)return;
+   try{validateFile(file);setFiles(current=>current.length<maxRequestFiles?[...current,file]:current);setLocalError('');}
+   catch(err){setLocalError((err as Error).message);}
+   e.target.value='';
+  }}/>
+ </label>}
+</fieldset>
+{localError&&<p className="field-error" role="alert">{localError}</p>}</div><div className="modal-footer"><span>İş, tüm ekip tarafından görülebilir.</span><button type="submit" className="button primary" disabled={busy}><Plus size={17}/>{busy?'Oluşturuluyor…':'Talebi oluştur'}</button></div></form></Modal>
 }
 function InviteModal({busy,demo,onClose,onSubmit}:{busy:boolean;demo:boolean;onClose:()=>void;onSubmit:(b:Record<string,unknown>)=>void}){const [name,setName]=useState(''),[email,setEmail]=useState(''),[team,setTeam]=useState('Meta Ekibi'),[password,setPassword]=useState(newPassword);return <Modal onClose={busy?()=>{}:onClose}><div className="modal-heading"><h2>Ekibe birini ekle</h2><button className="icon-btn" disabled={busy} aria-label="Kapat" onClick={onClose}><X size={20}/></button></div><form onSubmit={e=>{e.preventDefault();onSubmit({action:'create',name,email,team,password})}}><div className="modal-body"><p className="muted">{demo?'Deneme modunda şifre kaydedilmez.':'E-posta gönderilmez. Hesap hemen açılır; e-posta ve şifreyi çalışana kendin ilet.'}</p><label>Ad soyad<input required minLength={2} maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label><label>İş e-posta adresi<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><PasswordField value={password} onChange={setPassword}/><label>Birim<select value={team} onChange={e=>setTeam(e.target.value)}>{['Meta Ekibi','Grafik Tasarım','Teknik Destek','Operasyon','Yönetim'].map(t=><option key={t}>{t}</option>)}</select></label><div className="setup-note"><ShieldCheck size={20}/><p>Yeni hesap çalışan yetkisiyle açılır. Süper admin yetkisi verilmez.</p></div></div><div className="modal-footer"><span>Yalnızca çalışanlara özel</span><button className="button primary" disabled={busy}><Plus size={16}/>{demo?'Örnek kullanıcı ekle':'Kullanıcıyı oluştur'}</button></div></form></Modal>}
 function newPassword(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';const a=crypto.getRandomValues(new Uint32Array(12));return Array.from(a,n=>chars[n%chars.length]).join('')}
