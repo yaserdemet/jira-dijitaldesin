@@ -51,7 +51,7 @@
   text-align: left;
   cursor: pointer;
 }
-.request-option input[type="checkbox"] {
+.request-option input:is([type="checkbox"], [type="radio"]) {
   width: 16px;
   height: 16px;
   flex: 0 0 16px;
@@ -69,3 +69,13 @@
 .request-custom-size { margin-top: 12px; }
 .request-files .upload-zone, .request-files .picked-file { margin-top: 10px; }
 .request-files .picked-file span { overflow-wrap: anywhere; }
+
+.responsibility-options {
+  margin: 10px 0;
+  padding: 8px;
+  border: 1px solid #e4e8ed;
+  border-radius: 8px;
+  text-align: left;
+}
+.responsibility-options label { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.responsibility-options input { width: 16px; height: 16px; padding: 0; accent-color: #de663f; }

@@ -39,7 +39,7 @@ Deneme modunda gerçek hesap açılmaz, e-posta gönderilmez. Kayıtlar localSto
 ## Gerçek ekip kullanımını açma
 
 1. Hesapları ajansın sahip olduğu e-posta adresiyle açın. Bir Supabase projesi oluşturun; uygulama, veritabanı ve dosya depolama için uygun bölgeyi seçin.
-2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `002_disable_mfa.sql` ve `003_workflow.sql` dosyalarını bir kez çalıştırın.
+2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `002_disable_mfa.sql` `003_workflow.sql` ve `004_department_assignees.sql` dosyalarını bir kez çalıştırın.
 3. Authentication ayarlarında **Allow new users to sign up** seçeneğini kapatın. Uygulamada açık kayıt bulunmasa da bu ayar doğrudan API üzerinden kaydı kapatır. E-posta OTP ve davet akışını açık tutun.
 4. Authentication URL Configuration altında Site URL'yi gerçek HTTPS alan adınız yapın; davet/giriş dönüş adresini Redirect URLs listesine ekleyin. Yerel test gerekiyorsa `http://127.0.0.1:3000` adresini ayrıca ekleyin.
 5. Supabase Authentication panelinden ilk yöneticiyi davet edin. Ardından yalnızca SQL Editor'da, doğru e-posta adresini kullanarak çalıştırın:
@@ -111,3 +111,11 @@ Yorumlarda alıcı seçilebilir; Yanıtla düğmesi alıcıyı yorumun yazarına
 Nasıl Yapılır bölümünde çalışanlar metin tabanlı adım adım rehber yayımlayabilir. Rehberler ortak okunur ve yayımlama denetim kaydına eklenir. Örnek çalışma alanının eski kayıtları korunur; yeni bildirimler ve rehberler yalnızca aynı tarayıcıda saklanır. Gerçek ortak kullanım için Supabase bağlantısı gerekir.
 
 Kontroller: `npm test`, `npm run typecheck`, `npm run build`.
+
+
+Bölüm sorumluluklarını etkinleştirmek için mevcut Supabase veritabanında 003 sonrasında
+`supabase/migrations/004_department_assignees.sql` dosyasını çalıştırın.
+Süper admin, Ekip ekranından aktif kullanıcılara Yazılım Destek ve Grafik Tasarım
+sorumluluğu verebilir. İlk kurulumda teknik sorumlular Harun ve Yaser adlı mevcut
+hesaplardan, grafik sorumluları Grafik Tasarım ekibinden seçilir. Kullanıcı kaldırma
+hesabın erişimini kapatır. Auth ayarlarında herkese açık kullanıcı kaydını kapalı tutun.
