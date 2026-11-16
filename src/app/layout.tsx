@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google';
+import { themeBootScript } from '@/lib/theme';
 import './globals.css';
 
 // Başlıklar için karakterli bir grotesk, arayüz için sakin bir sans. İkisi de Türkçe karakterleri içerir.
@@ -14,7 +15,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr" className={`${display.variable} ${ui.variable}`}>
+    // Tema betiği <html>'e data-base/data-accent yazar; sunucu çıktısıyla farkı beklenen bir durum.
+    <html lang="tr" className={`${display.variable} ${ui.variable}`} suppressHydrationWarning>
+      {/* Bazı tarayıcı eklentileri <head>e öznitelik ekliyor; bu uyuşmazlık bizim kodumuzdan değil. */}
+      <head suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

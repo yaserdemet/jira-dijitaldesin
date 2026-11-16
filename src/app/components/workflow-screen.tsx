@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Board, StateRail, TaskList } from './board';
 import { Avatar, ConfirmAction, EmptyState, Panel, type Props, formatDate, paths } from './screen-kit';
 import { TaskDetail } from './task-detail';
+import { ThemeSettings } from './theme-settings';
 
 export type { Props } from './screen-kit';
 
@@ -118,6 +119,7 @@ export default function WorkflowScreen(p: Props) {
           </a>
           <nav className="hidden h-full items-stretch gap-5 md:flex" aria-label="Ana menü">{navLinks(false)}</nav>
           <div className="ml-auto flex items-center gap-1">
+            <ThemeSettings />
             <Button variant="ghost" size="icon" className="relative" aria-label={`Bildirimler, ${unread.length} okunmamış`} onClick={() => go('/bildirimler')}>
               <Bell />
               {unread.length > 0 && (

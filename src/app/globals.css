@@ -106,6 +106,47 @@
   }
 }
 
+/*
+  Kullanıcı temaları (Ayarlar menüsü): <html data-base="..." data-accent="...">.
+  Gri tonu = shadcn base color paletleri. Ana renk = butonlar, bağlantılar, seçili öğeler.
+  Durum renkleri (--state-*) anlam taşıdığı için temayla değişmez.
+*/
+[data-base="neutral"] {
+  --background: #f5f5f5; --foreground: #171717; --card-foreground: #171717; --popover-foreground: #171717;
+  --secondary: #e5e5e5; --secondary-foreground: #171717;
+  --muted: color-mix(in oklch, #f5f5f5, #e5e5e5); --muted-foreground: #525252;
+  --border: #e5e5e5; --input: #d4d4d4;
+}
+[data-base="stone"] {
+  --background: #f5f5f4; --foreground: #1c1917; --card-foreground: #1c1917; --popover-foreground: #1c1917;
+  --secondary: #e7e5e4; --secondary-foreground: #1c1917;
+  --muted: color-mix(in oklch, #f5f5f4, #e7e5e4); --muted-foreground: #57534e;
+  --border: #e7e5e4; --input: #d6d3d1;
+}
+[data-base="zinc"] {
+  --background: #f4f4f5; --foreground: #18181b; --card-foreground: #18181b; --popover-foreground: #18181b;
+  --secondary: #e4e4e7; --secondary-foreground: #18181b;
+  --muted: color-mix(in oklch, #f4f4f5, #e4e4e7); --muted-foreground: #52525b;
+  --border: #e4e4e7; --input: #d4d4d8;
+}
+[data-base="gray"] {
+  --background: #f3f4f6; --foreground: #111827; --card-foreground: #111827; --popover-foreground: #111827;
+  --secondary: #e5e7eb; --secondary-foreground: #111827;
+  --muted: color-mix(in oklch, #f3f4f6, #e5e7eb); --muted-foreground: #4b5563;
+  --border: #e5e7eb; --input: #d1d5db;
+}
+[data-base="slate"] {
+  --background: #f1f5f9; --foreground: #0f172a; --card-foreground: #0f172a; --popover-foreground: #0f172a;
+  --secondary: #e2e8f0; --secondary-foreground: #0f172a;
+  --muted: color-mix(in oklch, #f1f5f9, #e2e8f0); --muted-foreground: #475569;
+  --border: #e2e8f0; --input: #cbd5e1;
+}
+[data-accent="blue"] { --primary: #1d4ed8; --ring: #1d4ed8; --accent: #dbeafe; --accent-foreground: #1e40af; }
+[data-accent="green"] { --primary: #15803d; --ring: #15803d; --accent: #dcfce7; --accent-foreground: #166534; }
+[data-accent="violet"] { --primary: #6d28d9; --ring: #6d28d9; --accent: #ede9fe; --accent-foreground: #5b21b6; }
+[data-accent="orange"] { --primary: #c2410c; --ring: #c2410c; --accent: #ffedd5; --accent-foreground: #9a3412; }
+[data-accent="pink"] { --primary: #be185d; --ring: #be185d; --accent: #fce7f3; --accent-foreground: #9d174d; }
+
 /* Bildirimden açılan yorumu kısa süre vurgular (workflow-screen içindeki effect bu sınıfı ekler). */
 .wf-highlight {
   animation: comment-flash 2.4s ease-out;
