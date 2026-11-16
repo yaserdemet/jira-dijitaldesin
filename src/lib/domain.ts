@@ -15,7 +15,6 @@ export const taskSchema=z.object({title:z.string().trim().min(3,'Başlık en az 
 export type TaskInput = z.infer<typeof taskSchema>;
 export function canEdit(t:Task,p:Profile){return p.role==='super_admin'||t.creator_id===p.id||t.assignee_id===p.id}
 export function canApprove(t:Task,p:Profile){return p.role==='super_admin'||t.creator_id===p.id}
-export function isOverdue(t:Task,today=new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Istanbul'})){return !!t.due_date&&t.due_date<today&&!['Tamamlandı','İptal'].includes(t.status)}
 export function validateFile(file:Pick<File,'size'|'type'|'name'>){
   if(file.size===0)throw new Error('Boş dosya yüklenemez.');
   if(file.size>20*1024*1024)throw new Error('Dosya en fazla 20 MB olabilir.');
