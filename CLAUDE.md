@@ -14,7 +14,10 @@ npm run dev        # http://127.0.0.1:3000
 npm run typecheck  # tsc --noEmit
 npm test           # node:test + tsx; veritabanı testleri PGlite üzerinde
 npm run build
+npm run temizle -- --deneme   # tamamlanmış işleri silme raporu (silmez)
 ```
+
+`npm run temizle` canlı veritabanından tamamlanmış BÜTÜN işleri ve bağlı kayıtlarını kalıcı siler ("SIL" onayı ister). Kullanıcı açıkça istemedikçe yalnızca `--deneme` ile çalıştır. Yeni bir tablo `tasks`'a bağlanırsa `scripts/temizle.ts` silme sırasına ve ilgili teste ekle.
 
 Bir işi bitmiş saymadan önce `typecheck`, `test` ve `build` geçmeli. Arayüz değişikliğini tarayıcıda gözle kontrol et.
 Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kaldırma (kaldırılınca derleme "Jest worker ... child process exceptions" ile çöker).

@@ -115,5 +115,17 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   assert.equal((await db.query("select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='due_date'")).rows.length,0);
   await login(0);assert.ok(await newTask('Diğer Talepler'));
  });
+ await t.test('toplu temizlik (npm run temizle) sırası yabancı anahtarlara takılmaz',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Kontrol eder misin?',$3)`,[id,ids[0],ids[1]]);
+  await db.exec('reset role');
+  assert.ok((await db.query('select 1 from public.notifications where task_id=$1',[id])).rows.length>0,'bildirim oluşmalı');
+  // Eski sıra: bildirimler silinmeden yorum silinemez.
+  await assert.rejects(db.query('delete from public.messages where task_id=$1',[id]));
+  // scripts/temizle.ts sırası
+  for(const table of ['notifications','attachments','messages','task_events']) await db.query(`delete from public.${table} where task_id=$1`,[id]);
+  await db.query('delete from public.tasks where id=$1',[id]);
+  assert.equal((await db.query('select 1 from public.tasks where id=$1',[id])).rows.length,0);
+ });
  }finally{await db.close()}
 });
