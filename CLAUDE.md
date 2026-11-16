@@ -78,7 +78,10 @@ Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kal
 - Yeni kodu okunur, çok satırlı yaz; mevcut sıkıştırılmış tek satırlık kodu dokunduğun yerde ayrıştırabilirsin ama ilgisiz dosyaları yeniden biçimlendirme.
 - Kullanılmayan import/değişken bırakma (`npx tsc --noEmit --noUnusedLocals` temiz kalmalı).
 - Yorumlar "neden"i anlatsın, Türkçe ve kısa olsun.
-- Stil: `src/app/globals.css` ve `src/app/components/workflow.css`. Yeni renkleri CSS değişkeni olarak tanımla; öncelik renkleri pastel (`--p-bg`, `--p-ink`, `--p-line`).
+- Stil: Tailwind CSS v4 + shadcn/ui (Radix). Renk ve yazı tipi belirteçleri yalnızca `src/app/globals.css` içinde (`:root` + `@theme inline`); bileşenlerde sabit hex renk yazma, belirteç kullan (`bg-primary`, `text-state-problem`, `var(--prio-high-bg)`).
+- shadcn bileşenleri `src/components/ui/` altında; yenisini `npx shadcn@latest add <ad>` ile ekle, sonra sürümleri `package.json`'da tam sürüme sabitle. Ekran okuyucu metinlerini Türkçeleştir.
+- Görsel dil: baskı provası. Soğuk kâğıt zemin, mürekkep metin, proses camgöbeği eylem rengi, proses macenta sorun/iptal; öncelikler pastel CMY. Başlıklar Bricolage Grotesque (`font-display`), arayüz Instrument Sans. Kartlarda gölge yok, yalnızca kenarlık; gölge sadece havada duran öğelerde (diyalog, sürüklenen kart).
+- Ekran dosyaları: `workflow-screen.tsx` (yönlendirme + sayfalar), `board.tsx` (pano, renk barı, liste), `task-detail.tsx` (talep ayrıntısı), `forms.tsx` (giriş + diyaloglar), `screen-kit.tsx` (ortak rozetler, onay penceresi). `workspace.tsx` yalnızca veri ve iş mantığı.
 
 ## Tasarım
 
