@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Board, StateRail, TaskList } from './board';
 import { Avatar, ConfirmAction, EmptyState, Panel, type Props, formatDate, paths } from './screen-kit';
+import { useAvatar } from './avatar-store';
 import { TaskDetail } from './task-detail';
 import { ThemeSettingsPage, useThemeSync } from './theme-settings';
 
@@ -44,6 +45,7 @@ export default function WorkflowScreen(p: Props) {
   const [route, setRoute] = useState('/'), [search, setSearch] = useState(''), [filter, setFilter] = useState('Tümü'), [layout, setLayout] = useState('board'), [priority, setPriority] = useState('Tümü'), [from, setFrom] = useState(''), [to, setTo] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   useThemeSync();
+  const { avatarSrc } = useAvatar(p.person.id);
   useEffect(() => { const read = () => setRoute(window.location.pathname); read(); window.addEventListener('popstate', read); return () => window.removeEventListener('popstate', read); }, []);
   function go(path: string) { window.history.pushState(null, '', path); setRoute(new URL(path, window.location.origin).pathname); setSearch(''); setFilter('Tümü'); setPriority('Tümü'); setMenuOpen(false); window.scrollTo({ top: 0 }); }
   useEffect(() => { const id = new URLSearchParams(location.search).get('yorum'); if (id) { const timer = setTimeout(() => { const el = document.getElementById('yorum-' + id); el?.classList.add('wf-highlight'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150); return () => clearTimeout(timer); } }, [route, p.data.messages.length]);
@@ -132,7 +134,7 @@ export default function WorkflowScreen(p: Props) {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" aria-label="Hesap menüsü"><Avatar name={p.person.name} /></button>
+                <button type="button" className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" aria-label="Hesap menüsü"><Avatar name={p.person.name} src={avatarSrc} /></button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
@@ -283,7 +285,7 @@ export default function WorkflowScreen(p: Props) {
 
         {team && <Team p={p} go={go} />}
 
-        {settingsPage && <ThemeSettingsPage />}
+        {settingsPage && <ThemeSettingsPage person={p.person} />}
 
         {logs && (
           <Panel className="max-w-4xl">

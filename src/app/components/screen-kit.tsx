@@ -82,7 +82,12 @@ export function ProgressBar({ task, showLabel = false, className }: { task: Task
   );
 }
 
-export function Avatar({ name, size = 'md' }: { name?: string; size?: 'sm' | 'md' | 'lg' }) {
+export function Avatar({ name, src, size = 'md' }: { name?: string; src?: string | null; size?: 'sm' | 'md' | 'lg' }) {
+  const box = cn(size === 'sm' && 'size-6', size === 'md' && 'size-8', size === 'lg' && 'size-11');
+  if (src) {
+    // Avatar görseli kişinin adının yanında kullanıldığı için tekrar okunmaz (alt boş).
+    return <img src={src} alt="" title={name} width={64} height={64} className={cn('shrink-0 rounded-full bg-accent object-cover', box)} />;
+  }
   return (
     <span
       title={name ?? 'Atanmadı'}

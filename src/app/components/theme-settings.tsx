@@ -7,6 +7,8 @@ import {
   type ThemeKind, type ThemeOption, type ThemeSettings, defaultTheme, resolveScheme, themeGroups, themeKinds, themeStorageKey,
 } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import type { Profile } from '@/lib/domain';
+import { avatarOptions, useAvatar } from './avatar-store';
 import { Avatar, PriorityBadge } from './screen-kit';
 
 const prefersDark = () => typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -85,7 +87,8 @@ function OptionSample({ kind, option }: { kind: ThemeKind; option: ThemeOption }
   return <span className={cn('w-6 shrink-0 text-center text-base leading-none font-semibold', face)}>Aa</span>;
 }
 
-export function ThemeSettingsPage() {
+export function ThemeSettingsPage({ person }: { person: Profile }) {
+  const { avatarId, avatarSrc, setAvatar } = useAvatar(person.id);
   const [settings, setSettings] = useState<ThemeSettings>(() => (typeof window === 'undefined' ? defaultTheme : readSettings()));
   const [systemDark, setSystemDark] = useState(prefersDark);
   useEffect(() => {
@@ -109,6 +112,36 @@ export function ThemeSettingsPage() {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="divide-y rounded-xl border bg-card">
+        <section className="grid gap-4 p-5 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div>
+            <h2 id="theme-avatar" className="font-sans text-base font-semibold">Avatar</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Üst menüde senin yerine görünür. Seçim bu tarayıcıda saklanır.</p>
+          </div>
+          <div role="radiogroup" aria-labelledby="theme-avatar" className="flex flex-wrap content-start items-center gap-3">
+            {[{ id: null, src: null }, ...avatarOptions].map((option, i) => {
+              const active = avatarId === option.id;
+              return (
+                <button
+                  key={option.id ?? 'initial'}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={option.id ? `Avatar ${i}` : 'Baş harf'}
+                  title={option.id ? `Avatar ${i}` : 'Baş harf'}
+                  onClick={() => setAvatar(option.id)}
+                  className={cn(
+                    'rounded-full p-0.5 ring-offset-2 ring-offset-card transition-shadow focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+                    active ? 'ring-2 ring-primary' : 'hover:ring-2 hover:ring-foreground/20',
+                  )}
+                >
+                  {option.src
+                    ? <img src={option.src} alt="" width={56} height={56} className="size-14 rounded-full bg-accent object-cover" />
+                    : <span className="flex size-14 items-center justify-center rounded-full bg-accent font-semibold text-accent-foreground">{person.name.trim().slice(0, 1).toLocaleUpperCase('tr')}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
         {sections.map(({ kind, title, description, lightOnly }) => {
           const disabled = lightOnly && dark;
           return (
@@ -159,7 +192,7 @@ export function ThemeSettingsPage() {
             <footer className="mt-3 flex items-center gap-2">
               <PriorityBadge priority="Yüksek" />
               <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><MessageSquare className="size-3.5" /> 2</span>
-              <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">Elif <Avatar name="Elif Yılmaz" size="sm" /></span>
+              <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">{person.name.split(' ')[0]} <Avatar name={person.name} src={avatarSrc} size="sm" /></span>
             </footer>
           </article>
         </div>
