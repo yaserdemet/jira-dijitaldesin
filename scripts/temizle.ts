@@ -6,6 +6,7 @@
 //   npm run temizle -- --deneme              yalnızca rapor, hiçbir şey silmez
 //   npm run temizle -- --once 2026-01-01     yalnızca bu tarihten önce tamamlananlar
 //   npm run temizle -- --iptal               iptal edilen işleri de dahil et
+//   npm run temizle -- --onay SIL            onayı komutla ver (klavye girişi olmayan terminaller için)
 // Seçenekler birlikte kullanılabilir.
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
@@ -23,9 +24,11 @@ function fail(msg: string): never {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const known = new Set(['--deneme', '--iptal', '--once']);
-  const unknown = args.filter((a, i) => a.startsWith('--') && !known.has(a) && args[i - 1] !== '--once');
-  if (unknown.length) fail(`Bilinmeyen seçenek: ${unknown.join(', ')}. Kullanılabilenler: --deneme, --iptal, --once YYYY-AA-GG`);
+  const known = new Set(['--deneme', '--iptal', '--once', '--onay']);
+  const unknown = args.filter((a, i) => a.startsWith('--') && !known.has(a) && args[i - 1] !== '--once' && args[i - 1] !== '--onay');
+  if (unknown.length) fail(`Bilinmeyen seçenek: ${unknown.join(', ')}. Kullanılabilenler: --deneme, --iptal, --once YYYY-AA-GG, --onay SIL`);
+  const j = args.indexOf('--onay');
+  const confirmArg = j >= 0 ? (args[j + 1] ?? '') : undefined;
 
   let date: string | undefined, cutoff: string | undefined;
   const i = args.indexOf('--once');
@@ -36,14 +39,14 @@ function parseArgs() {
     if (Number.isNaN(check.getTime()) || check.toISOString().slice(0, 10) !== date) fail(`Geçersiz tarih: ${date}`);
     cutoff = new Date(`${date}T00:00:00+03:00`).toISOString();
   }
-  return { date, cutoff, dryRun: args.includes('--deneme'), withCancelled: args.includes('--iptal') };
+  return { date, cutoff, dryRun: args.includes('--deneme'), withCancelled: args.includes('--iptal'), confirmArg };
 }
 
 const chunks = <T,>(arr: T[], n = CHUNK) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} MB`;
 
 async function main() {
-  const { date, cutoff, dryRun, withCancelled } = parseArgs();
+  const { date, cutoff, dryRun, withCancelled, confirmArg } = parseArgs();
   if (existsSync('.env.local')) process.loadEnvFile('.env.local');
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -123,10 +126,20 @@ async function main() {
 
   if (dryRun) { console.log('\nDeneme modu: hiçbir şey silinmedi.\n'); return; }
 
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = (await rl.question('\nBu işlem GERİ ALINAMAZ. Onaylamak için "SIL" yazın: ')).trim();
-  rl.close();
+  // Onay: klavyeden "SIL" ya da klavye girişi olmayan ortamlarda `--onay SIL`.
+  let answer = confirmArg ?? '';
+  if (confirmArg === undefined) {
+    if (!process.stdin.isTTY) {
+      console.log('\nOnay alınamadı: bu terminal klavye girişi kabul etmiyor. Hiçbir şey silinmedi.');
+      console.log('Silmek için onayı komutla verin:  npm run temizle -- --onay SIL\n');
+      return;
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    answer = (await rl.question('\nBu işlem GERİ ALINAMAZ. Onaylamak için "SIL" yazın: ')).trim();
+    rl.close();
+  }
   if (answer !== 'SIL') { console.log('\nOnay verilmedi. Hiçbir şey silinmedi.\n'); return; }
+  console.log('\nOnaylandı, siliniyor…');
 
   // 3) Önce kayıtlar: bildirimler yorumlara ve işlere, diğerleri işlere bağlı olduğu için bu sırayla.
   //    Dosyalar en sonda silinir; bir adım takılırsa dosya kaybolmaz, komut yeniden çalıştırılabilir.
