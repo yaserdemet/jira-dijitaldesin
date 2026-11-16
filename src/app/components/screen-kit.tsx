@@ -76,7 +76,8 @@ export function ProgressBar({ task, showLabel = false, className }: { task: Task
         </div>
       )}
       <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={100} aria-label="İlerleme">
-        <div className={cn('h-full rounded-full transition-[width] duration-300', stateStyle[state].bar)} style={{ width: `${value}%` }} />
+        {/* Genişlik yerine scaleX: düzen hesaplamadan, GPU'da çalışır. */}
+        <div className={cn('h-full w-full origin-left rounded-full transition-transform duration-250 ease-out', stateStyle[state].bar)} style={{ transform: `scaleX(${value / 100})` }} />
       </div>
     </div>
   );

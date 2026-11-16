@@ -121,7 +121,7 @@ export default function WorkflowScreen(p: Props) {
             <Button variant="ghost" size="icon" className="relative" aria-label={`Bildirimler, ${unread.length} okunmamış`} onClick={() => go('/bildirimler')}>
               <Bell />
               {unread.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-white">{unread.length}</span>
+                <span key={unread.length} className="motion-pop absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-white">{unread.length}</span>
               )}
             </Button>
             <DropdownMenu>
@@ -152,7 +152,9 @@ export default function WorkflowScreen(p: Props) {
             </Select>
           </div>
         )}
-        {p.error && <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" role="alert">{p.error}</div>}
+        {p.error && <div className="motion-reveal mb-6 rounded-lg border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm text-destructive" role="alert">{p.error}</div>}
+
+        <div key={route} className="motion-page">
 
         {home ? (
           <Home p={p} go={go} unread={unread} noticeRow={noticeRow} events={events} firstName={firstName} />
@@ -296,16 +298,14 @@ export default function WorkflowScreen(p: Props) {
           <EmptyState>Bu sayfa bulunamadı. Üst menüden devam edebilirsin.</EmptyState>
         )}
 
+        </div>
+
         <footer className="mt-16 border-t pt-4 text-xs text-muted-foreground">
           {p.demo ? 'Örnek veriler bu tarayıcıya kaydedilir.' : 'İşler ve bildirimler 30 saniyede bir kendiliğinden yenilenir.'}
         </footer>
       </main>
 
-      {p.toast && (
-        <div role="status" className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm text-background shadow-lg animate-in fade-in slide-in-from-bottom-2">
-          <Check className="size-4" /> {p.toast}
-        </div>
-      )}
+      <Toast message={p.toast} />
       {p.busy && (
         <div className="fixed top-16 right-4 z-50 flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
           <LoaderCircle className="size-3.5 animate-spin" /> Kaydediliyor
@@ -476,5 +476,20 @@ function GuideForm({ p }: { p: Props }) {
       <div className="grid gap-2"><Label htmlFor="guide-body">Adımlar</Label><Textarea id="guide-body" required minLength={10} maxLength={20000} rows={8} placeholder={'1. İlk adım\n2. İkinci adım'} value={body} onChange={e => setBody(e.target.value)} /></div>
       <Button type="submit" disabled={p.busy}>Rehberi yayımla</Button>
     </form>
+  );
+}
+
+// Bildirim mesajı kapanırken metni korur ki aynı kenardan kayarak çıkabilsin.
+function Toast({ message }: { message: string }) {
+  const [text, setText] = useState(message);
+  if (message && message !== text) setText(message);
+  if (!text) return null;
+  return (
+    <div
+      role="status" aria-live="polite" data-open={!!message}
+      className="motion-toast fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-foreground px-4 py-2.5 text-sm text-background shadow-lg"
+    >
+      <Check className="size-4" /> {text}
+    </div>
   );
 }

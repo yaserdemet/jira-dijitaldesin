@@ -83,6 +83,16 @@ Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kal
 - Görsel dil: baskı provası. Soğuk kâğıt zemin, mürekkep metin, proses camgöbeği eylem rengi, proses macenta sorun/iptal; öncelikler pastel CMY. Başlıklar Bricolage Grotesque (`font-display`), arayüz Instrument Sans. Kartlarda gölge yok, yalnızca kenarlık; gölge sadece havada duran öğelerde (diyalog, sürüklenen kart).
 - Ekran dosyaları: `workflow-screen.tsx` (yönlendirme + sayfalar), `board.tsx` (pano, renk barı, liste), `task-detail.tsx` (talep ayrıntısı), `forms.tsx` (giriş + diyaloglar), `screen-kit.tsx` (ortak rozetler, onay penceresi). `workspace.tsx` yalnızca veri ve iş mantığı.
 
+## Animasyon
+
+`.claude/skills/` altında Emil Kowalski'nin animasyon skill'leri var (`emil-design-eng`, `animate`, `find-animation-opportunities`, `review-animations`, `improve-animations`, `remove-animations`, `animation-performance`, `choreograph`). Hareket eklemeden önce bunlara göre karar ver:
+
+- Önce sor: günde kaç kez görülüyor, amacı ne? Klavye eylemleri ve günde onlarca kez kullanılan gezinme animasyonlanmaz (sayfa geçişi bilerek yalnızca 150ms solma).
+- Yalnızca `transform` ve `opacity`; `transition-all` yasak. `scale(0)` yok, `scale(0.9+)` + `opacity: 0`.
+- Eğriler `globals.css`'teki belirteçlerden: `ease-out` (Tailwind sınıfı da bu güçlü eğriye bağlı), `--ease-in-out`, `--ease-drawer`. Arayüzde 300ms'yi aşma (diyalog/çekmece/bildirim hariç).
+- Hazır sınıflar: `motion-page`, `motion-reveal`, `motion-card-landed`, `motion-pickup`, `motion-pop`, `motion-toast`. Giriş `@starting-style` ile, JS yok. Hareket kütüphanesi (Motion) yalnızca yay/jest gerekirse.
+- "Hareketi azalt" ayarı: konum/ölçek kalkar, solma kalır (sıfırlama değil). Yeni animasyonu `globals.css`'teki `prefers-reduced-motion` bloğuna ekle.
+
 ## Tasarım
 
 Arayüz değişikliklerinde `.claude/skills/frontend-design` skill'ini kullan; ama ürünün hedefi **sade ve anlaşılır** olmak. Yeni kavram, alan veya buton eklemeden önce gerçekten gerekli mi diye sor; kartlar yalnızca başlık, marka, öncelik, sorumlu ve yorum sayısını gösterir.
