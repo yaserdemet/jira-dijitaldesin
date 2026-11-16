@@ -34,12 +34,12 @@ function FormError({ message, onClear }: { message: string; onClear?: () => void
 function RegistrationMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      <g style={{ mixBlendMode: 'multiply' }}>
+      <g className="mix-blend-multiply dark:mix-blend-screen">
         <circle cx="96" cy="100" r="62" fill="#00a3df" opacity="0.85" />
         <circle cx="144" cy="100" r="62" fill="#e5007e" opacity="0.75" />
         <circle cx="120" cy="142" r="62" fill="#ffe600" opacity="0.85" />
       </g>
-      <g stroke="#1c232b" strokeWidth="1.5" fill="none">
+      <g stroke="currentColor" strokeWidth="1.5" fill="none" className="text-foreground">
         <circle cx="120" cy="120" r="104" />
         <line x1="120" y1="4" x2="120" y2="236" />
         <line x1="4" y1="120" x2="236" y2="120" />
@@ -56,7 +56,7 @@ export function Login({ busy, configured, allowDemo, onDemo, error, run, session
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden border-r bg-background p-10 lg:flex">
-        <img src="/logo.svg" alt="dijitaldesin" className="h-16 w-auto self-start" />
+        <img src="/logo.svg" alt="dijitaldesin" className="h-16 w-auto self-start dark:invert" />
         <RegistrationMark className="pointer-events-none absolute top-1/2 -right-24 size-[460px] -translate-y-1/2 opacity-90" />
         <div className="relative max-w-md">
           <h1 className="text-5xl leading-[1.02] font-semibold tracking-tight">Ajansın bütün talepleri tek panoda.</h1>
@@ -67,7 +67,7 @@ export function Login({ busy, configured, allowDemo, onDemo, error, run, session
 
       <section className="flex items-center justify-center bg-card px-6 py-12">
         <div className="w-full max-w-sm">
-          <img src="/logo.svg" alt="dijitaldesin" className="mb-10 h-14 w-auto lg:hidden" />
+          <img src="/logo.svg" alt="dijitaldesin" className="mb-10 h-14 w-auto lg:hidden dark:invert" />
           <h2 className="text-3xl font-semibold tracking-tight">{session ? 'Hesabına erişim yok' : 'Giriş yap'}</h2>
           <p className="mt-2 text-muted-foreground">
             {session ? 'Hesabının erişimi kapalı ya da henüz açılmamış. Yöneticinle görüş.' : 'Yöneticinin sana verdiği e-posta ve şifreyi kullan.'}

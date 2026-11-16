@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Archive, ArrowLeft, Bell, BookOpen, Check, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Wrench } from 'lucide-react';
+import { Archive, ArrowLeft, Bell, BookOpen, Check, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Wrench } from 'lucide-react';
 import { type Task, canAssignCategory, reportCsv } from '@/lib/domain';
 import { type Notice, type WorkflowState, categoryLabels, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { Board, StateRail, TaskList } from './board';
 import { Avatar, ConfirmAction, EmptyState, Panel, type Props, formatDate, paths } from './screen-kit';
 import { TaskDetail } from './task-detail';
-import { ThemeSettings } from './theme-settings';
+import { ThemeSettingsPage, useThemeSync } from './theme-settings';
 
 export type { Props } from './screen-kit';
 
@@ -37,11 +37,13 @@ const subtitles: Record<string, string> = {
   '/kayitlar': 'Talep, yorum, dosya ve kullanıcı işlemlerinin kaydı.',
   '/bildirimler': 'Sana yazılan yorumlar ve atamalar.',
   '/nasil-yapilir': 'Ekibin yazdığı adım adım rehberler.',
+  '/ayarlar': 'Görünümü kendine göre ayarla. Değişiklikler hemen uygulanır.',
 };
 
 export default function WorkflowScreen(p: Props) {
   const [route, setRoute] = useState('/'), [search, setSearch] = useState(''), [filter, setFilter] = useState('Tümü'), [layout, setLayout] = useState('board'), [priority, setPriority] = useState('Tümü'), [from, setFrom] = useState(''), [to, setTo] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  useThemeSync();
   useEffect(() => { const read = () => setRoute(window.location.pathname); read(); window.addEventListener('popstate', read); return () => window.removeEventListener('popstate', read); }, []);
   function go(path: string) { window.history.pushState(null, '', path); setRoute(new URL(path, window.location.origin).pathname); setSearch(''); setFilter('Tümü'); setPriority('Tümü'); setMenuOpen(false); window.scrollTo({ top: 0 }); }
   useEffect(() => { const id = new URLSearchParams(location.search).get('yorum'); if (id) { const timer = setTimeout(() => { const el = document.getElementById('yorum-' + id); el?.classList.add('wf-highlight'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150); return () => clearTimeout(timer); } }, [route, p.data.messages.length]);
@@ -54,12 +56,12 @@ export default function WorkflowScreen(p: Props) {
   const guide = p.guides.find(g => route === '/rehber/' + g.id);
   // Yeni talep penceresi açıkken (/yeni) arkada ana sayfa görünür.
   const home = route === '/' || route === '/yeni', reports = route === '/raporlar', team = route === '/ekip', logs = route === '/kayitlar', notifications = route === '/bildirimler', guides = route === '/nasil-yapilir';
-  const mine = route === '/islerim', created = route === '/actiklarim', archive = route === '/arsiv';
+  const mine = route === '/islerim', created = route === '/actiklarim', archive = route === '/arsiv', settingsPage = route === '/ayarlar';
   const listing = !!category || mine || created || archive || route === '/talepler' || reports;
   // Raporlar arşivi de kapsar; arşiv sayfası yalnızca arşivi, diğer ekranlar yalnızca açık panoyu gösterir.
   const inScope = (t: Task) => (!category || t.category === category) && (!mine || t.assignee_id === p.person.id) && (!created || t.creator_id === p.person.id) && (reports || (archive ? !!t.archived_at : !t.archived_at));
   const tasks = p.data.tasks.filter(t => inScope(t) && (filter === 'Tümü' || workflowState(t) === filter) && (priority === 'Tümü' || t.priority === priority) && (`${t.title} ${t.brand} ${t.number}`.toLocaleLowerCase('tr').includes(search.toLocaleLowerCase('tr'))) && (!reports || ((!from || t.created_at.slice(0, 10) >= from) && (!to || t.created_at.slice(0, 10) <= to))));
-  const titles: Record<string, string> = { '/islerim': 'İşlerim', '/actiklarim': 'Açtıklarım', '/arsiv': 'Arşiv', '/talepler': 'Tüm talepler', '/raporlar': 'Raporlar', '/ekip': 'Ekip', '/kayitlar': 'Denetim kayıtları', '/bildirimler': 'Bildirimler', '/nasil-yapilir': 'Nasıl yapılır' };
+  const titles: Record<string, string> = { '/islerim': 'İşlerim', '/actiklarim': 'Açtıklarım', '/arsiv': 'Arşiv', '/talepler': 'Tüm talepler', '/raporlar': 'Raporlar', '/ekip': 'Ekip', '/kayitlar': 'Denetim kayıtları', '/bildirimler': 'Bildirimler', '/nasil-yapilir': 'Nasıl yapılır', '/ayarlar': 'Ayarlar' };
   const events = [...p.data.events, ...p.data.tasks.filter(t => !p.data.events.some(e => e.task_id === t.id && e.action === 'Talep oluşturuldu')).map(t => ({ id: 'created-' + t.id, task_id: t.id, actor_id: t.creator_id, action: 'Talep oluşturuldu', details: t.title, created_at: t.created_at }))].sort((a, b) => b.created_at.localeCompare(a.created_at));
   function saveCsv() { const url = URL.createObjectURL(new Blob([reportCsv(tasks, p.data.profiles)], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'akis-rapor.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
@@ -115,11 +117,13 @@ export default function WorkflowScreen(p: Props) {
             </SheetContent>
           </Sheet>
           <a href="/" onClick={e => { e.preventDefault(); go('/'); }} className="shrink-0 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded">
-            <img src="/logo.svg" alt="dijitaldesin" className="h-11 w-auto" />
+            <img src="/logo.svg" alt="dijitaldesin" className="h-11 w-auto dark:invert" />
           </a>
           <nav className="hidden h-full items-stretch gap-5 md:flex" aria-label="Ana menü">{navLinks(false)}</nav>
           <div className="ml-auto flex items-center gap-1">
-            <ThemeSettings />
+            <Button variant="ghost" size="icon" aria-label="Ayarlar" aria-current={settingsPage ? 'page' : undefined} className={cn(settingsPage && 'bg-accent text-accent-foreground')} onClick={() => go('/ayarlar')}>
+              <Settings />
+            </Button>
             <Button variant="ghost" size="icon" className="relative" aria-label={`Bildirimler, ${unread.length} okunmamış`} onClick={() => go('/bildirimler')}>
               <Bell />
               {unread.length > 0 && (
@@ -136,6 +140,7 @@ export default function WorkflowScreen(p: Props) {
                   <span className="block truncate text-xs text-muted-foreground">{p.person.email}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => go('/ayarlar')}><Settings /> Ayarlar</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => p.onPassword(p.person)}>Şifremi değiştir</DropdownMenuItem>
                 <DropdownMenuItem onSelect={p.onLogout}><LogOut /> Çıkış yap</DropdownMenuItem>
               </DropdownMenuContent>
@@ -278,6 +283,8 @@ export default function WorkflowScreen(p: Props) {
 
         {team && <Team p={p} go={go} />}
 
+        {settingsPage && <ThemeSettingsPage />}
+
         {logs && (
           <Panel className="max-w-4xl">
             {p.person.role === 'super_admin' ? (
@@ -294,7 +301,7 @@ export default function WorkflowScreen(p: Props) {
           </Panel>
         )}
 
-        {!home && !listing && !selected && !guide && !guides && !team && !logs && !notifications && (
+        {!home && !listing && !selected && !guide && !guides && !team && !logs && !notifications && !settingsPage && (
           <EmptyState>Bu sayfa bulunamadı. Üst menüden devam edebilirsin.</EmptyState>
         )}
 

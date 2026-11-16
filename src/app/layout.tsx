@@ -4,8 +4,8 @@ import { themeBootScript } from '@/lib/theme';
 import './globals.css';
 
 // Başlıklar için karakterli bir grotesk, arayüz için sakin bir sans. İkisi de Türkçe karakterleri içerir.
-const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], variable: '--font-display' });
-const ui = Instrument_Sans({ subsets: ['latin', 'latin-ext'], variable: '--font-ui' });
+const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], variable: '--font-brand-display' });
+const ui = Instrument_Sans({ subsets: ['latin', 'latin-ext'], variable: '--font-brand-ui' });
 
 export const metadata: Metadata = {
   title: 'Akış · dijitaldesin',

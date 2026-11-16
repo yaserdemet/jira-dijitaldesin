@@ -11,6 +11,8 @@
 */
 :root {
   --radius: 0.625rem;
+  --font-display-face: var(--font-brand-display);
+  --font-ui-face: var(--font-brand-ui);
 
   --background: #f3f5f7;
   --foreground: #1c232b;
@@ -50,9 +52,9 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-ui);
-  --font-heading: var(--font-display);
-  --font-display: var(--font-display);
+  --font-sans: var(--font-ui-face);
+  --font-heading: var(--font-display-face);
+  --font-display: var(--font-display-face);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -146,6 +148,81 @@
 [data-accent="violet"] { --primary: #6d28d9; --ring: #6d28d9; --accent: #ede9fe; --accent-foreground: #5b21b6; }
 [data-accent="orange"] { --primary: #c2410c; --ring: #c2410c; --accent: #ffedd5; --accent-foreground: #9a3412; }
 [data-accent="pink"] { --primary: #be185d; --ring: #be185d; --accent: #fce7f3; --accent-foreground: #9d174d; }
+
+
+/* Zemin rengi: gri tonunun zeminini, ikincil ve soluk yüzeyleri renklendirir. Kontrast WCAG AA ile ölçüldü. */
+[data-bg="sky"] { --background: #eef6fb; --secondary: #dcebf5; --muted: #e5f0f8; }
+[data-bg="mint"] { --background: #edf7f1; --secondary: #d9eee2; --muted: #e3f2ea; }
+[data-bg="lavender"] { --background: #f4f2fc; --secondary: #e2ddf5; --muted: #ebe7f9; }
+[data-bg="sand"] { --background: #f7f3ea; --secondary: #ebe3d3; --muted: #f1ebde; }
+[data-bg="rose"] { --background: #fbf0f3; --secondary: #f3dbe2; --muted: #f7e5eb; }
+[data-bg="accent"] {
+  --background: color-mix(in oklch, var(--primary) 5%, #fbfcfd);
+  --secondary: color-mix(in oklch, var(--primary) 12%, #f4f6f8);
+  --muted: color-mix(in oklch, var(--primary) 8%, #f6f7f9);
+}
+
+/* Köşeler: shadcn bileşenlerinin tamamı --radius'tan türetilir. */
+[data-radius="sharp"] { --radius: 0.25rem; }
+[data-radius="round"] { --radius: 1rem; }
+
+/* Yoğunluk: Tailwind v4'te bütün boşluk ve yükseklik sınıfları --spacing ile orantılıdır (varsayılan 0.25rem). */
+[data-density="compact"] { --spacing: 0.22rem; }
+[data-density="comfortable"] { --spacing: 0.28rem; }
+
+/* Yazı tipi: yeni font indirilmez, mevcutlar ve işletim sisteminin fontu kullanılır. */
+[data-font="plain"] { --font-display-face: var(--font-brand-ui); }
+[data-font="system"] {
+  --font-display-face: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-ui-face: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/*
+  Koyu tema (data-scheme="dark" ve .dark sınıfı; shadcn'in dark: varyantı .dark'a bakar).
+  Dosyanın sonunda durduğu için gri tonu ve zemin seçimlerini geçersiz kılar; ana renk açık tonuyla kullanılır.
+  Tüm metin/zemin çiftleri en az 4.5:1 kontrastta ölçüldü.
+*/
+[data-scheme="dark"] {
+  color-scheme: dark;
+  --background: #0f1419;
+  --foreground: #e6e9ed;
+  --card: #161c23;
+  --card-foreground: #e6e9ed;
+  --popover: #1a2129;
+  --popover-foreground: #e6e9ed;
+  --primary: #4cb3e6;
+  --primary-foreground: #0f1419;
+  --secondary: #1f2730;
+  --secondary-foreground: #e6e9ed;
+  --muted: #1b222a;
+  --muted-foreground: #9aa5b1;
+  --accent: color-mix(in oklch, var(--primary) 18%, #161c23);
+  --accent-foreground: var(--primary);
+  --destructive: #ec5b8d;
+  --border: #2a333d;
+  --input: #36404b;
+  --ring: var(--primary);
+
+  --state-waiting: #8b96a5;
+  --state-doing: #4cb3e6;
+  --state-done: #3fbf82;
+  --state-problem: #ec5b8d;
+
+  --prio-normal-bg: #12354a;
+  --prio-normal-ink: #9ad3f2;
+  --prio-normal-line: #1f4d68;
+  --prio-high-bg: #3a3110;
+  --prio-high-ink: #f5d66b;
+  --prio-high-line: #5a4a14;
+  --prio-urgent-bg: #44142a;
+  --prio-urgent-ink: #f5a3c4;
+  --prio-urgent-line: #6a2241;
+}
+[data-scheme="dark"][data-accent="blue"] { --primary: #60a5fa; }
+[data-scheme="dark"][data-accent="green"] { --primary: #4ade80; }
+[data-scheme="dark"][data-accent="violet"] { --primary: #a78bfa; }
+[data-scheme="dark"][data-accent="orange"] { --primary: #fb923c; }
+[data-scheme="dark"][data-accent="pink"] { --primary: #f472b6; }
 
 /* Bildirimden açılan yorumu kısa süre vurgular (workflow-screen içindeki effect bu sınıfı ekler). */
 .wf-highlight {
