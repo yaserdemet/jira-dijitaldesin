@@ -43,7 +43,7 @@ Deneme modunda gerçek hesap açılmaz, e-posta gönderilmez. Kayıtlar localSto
 Giriş e-posta ve şifreyle yapılır. E-posta gönderilmez; iki aşamalı doğrulama yoktur. Çalışan hesaplarını süper admin uygulamadan açar ve şifreyi çalışana kendisi iletir.
 
 1. Hesapları ajansın sahip olduğu e-posta adresiyle açın. Bir Supabase projesi oluşturun; uygulama, veritabanı ve dosya depolama için uygun bölgeyi seçin.
-2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql`, `004_department_assignees.sql` ve `005_archive_and_rules.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
+2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql`, `004_department_assignees.sql`, `005_archive_and_rules.sql` ve `006_drop_due_date.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
 3. Authentication ayarlarında **Allow new users to sign up** seçeneğini kapatın. Email sağlayıcısı (şifreyle giriş) açık kalmalı.
 4. Supabase **Authentication → Users → Add user** ile ilk yöneticiyi e-posta ve şifreyle oluşturun (**Auto Confirm User** işaretli). Ardından SQL Editor'da, doğru e-posta adresiyle çalıştırın:
 

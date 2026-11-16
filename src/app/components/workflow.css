@@ -95,8 +95,12 @@
 .wf-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .wf-card-top small{color:#a1a8b2;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wf-prio{flex-shrink:0;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px}
-.wf-prio.high{background:#fff3e6;color:#c47528}
-.wf-prio.urgent{background:#fdecec;color:#c24545}
+.wf-prio{display:inline-block;border:1px solid transparent}
+/* Pastel öncelik renkleri: Normal nane, Yüksek şeftali, Acil gül */
+.wf-prio.normal,.prio-chip.normal{--p-bg:#e6f6ee;--p-ink:#3f8a65;--p-line:#bfe6d1}
+.wf-prio.high,.prio-chip.high{--p-bg:#fff0e0;--p-ink:#b56d2a;--p-line:#f7d6b3}
+.wf-prio.urgent,.prio-chip.urgent{--p-bg:#fde8ec;--p-ink:#b94a5f;--p-line:#f5c3cd}
+.wf-prio{background:var(--p-bg);color:var(--p-ink);border-color:var(--p-line)}
 .wf-task .wf-issue{margin:0 0 9px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .wf-task .wf-track{height:4px;margin-bottom:10px}
 .wf-card-foot{display:flex;align-items:center;gap:8px;color:#929ba7;font-size:11px}
@@ -115,3 +119,10 @@
 .category-switch button{flex:1;border:0;background:none;padding:9px 10px;border-radius:7px;color:#7d8794;font-weight:600;cursor:pointer}
 .category-switch button.selected{background:#fff;color:#2d3946;box-shadow:0 1px 3px #12233318}
 .wf-all svg{vertical-align:-3px;margin-right:5px}
+
+.priority-picker{border:0;padding:0;margin:0}
+.priority-picker legend{font-size:13px;font-weight:600;color:#3a4552;margin-bottom:8px;padding:0}
+.priority-picker>div{display:flex;gap:8px}
+.prio-chip{flex:1;border:1.5px solid var(--p-line);background:var(--p-bg);color:var(--p-ink);border-radius:9px;padding:10px;font-weight:600;cursor:pointer;opacity:.6;transition:opacity .15s,box-shadow .15s}
+.prio-chip:hover{opacity:.85}
+.prio-chip.selected{opacity:1;border-color:var(--p-ink);box-shadow:0 0 0 3px var(--p-bg)}

@@ -1,12 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, FileText, LoaderCircle, Paperclip, Plus, ShieldCheck, Sparkles, X, KeyRound, ArrowRight } from 'lucide-react';
-import { Attachment, Audit, Category, Data, Message, Profile, Task, TaskInput, assignableProfiles, canEdit, canManage, categories, taskSchema, validateFile } from '@/lib/domain';
+import { Attachment, Audit, Category, Data, Message, Profile, Task, TaskInput, assignableProfiles, canEdit, canManage, categories, priorities, taskSchema, validateFile } from '@/lib/domain';
 import { supabase, demoAllowed } from '@/lib/client';
 import { getDemoFile, putDemoFile, readDemo, saveDemo } from '@/lib/demo';
 import { designSizes, requestForms } from './request-forms';
 import WorkflowScreen from './workflow-screen';
-import {Guide,Notice,canRequestRevision,categoryLabels,taskProgress,workflowState} from '@/lib/workflow';
+import {Guide,Notice,canRequestRevision,categoryLabels,priorityClass,taskProgress,workflowState} from '@/lib/workflow';
 import type { Session } from '@supabase/supabase-js';
 const empty:Data={profiles:[],tasks:[],messages:[],attachments:[],logs:[],events:[]};
 const maxRequestFiles=10;
@@ -159,7 +159,7 @@ function Login({busy,configured,allowDemo,onDemo,error,run,session,onLogout}:{bu
 }
 function Modal({children,onClose,wide=false,page=false}:{children:React.ReactNode;onClose:()=>void;wide?:boolean;page?:boolean}){const ref=useRef<HTMLDivElement>(null);const closeRef=useRef(onClose);closeRef.current=onClose;useEffect(()=>{const previous=document.activeElement as HTMLElement;const overflow=document.body.style.overflow;document.body.style.overflow='hidden';ref.current?.focus();function key(e:KeyboardEvent){if(e.key==='Escape')closeRef.current();if(e.key==='Tab'){const items=Array.from(ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]')??[]);const first=items[0],last=items.at(-1);if(!first)return;if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last?.focus()}else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===ref.current)){e.preventDefault();first.focus()}}}document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);previous?.focus()}},[]);return <div className={page?"fullpage-backdrop":"modal-backdrop"} onMouseDown={e=>{if(!page&&e.target===e.currentTarget)onClose()}}><div ref={ref} tabIndex={-1} role={page?undefined:"dialog"} aria-modal={page?undefined:true} aria-label="Talep ve ekip işlemleri" className={`modal ${wide?'wide':''}`}>{children}</div></div>}
 function CreateModal({profiles,category,onCategory,busy,onClose,onSubmit}:{profiles:Profile[];category:Category;onCategory:(c:Category)=>void;busy:boolean;onClose:()=>void;onSubmit:(input:TaskInput,files:File[])=>void}){
- const [input,setInput]=useState<TaskInput>({title:'',description:'',category,brand:'',priority:'Normal',assignee_id:null,due_date:new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Istanbul'})});
+ const [input,setInput]=useState<TaskInput>({title:'',description:'',category,brand:'',priority:'Normal',assignee_id:null});
  const [files,setFiles]=useState<File[]>([]);
  const [localError,setLocalError]=useState('');
  const [requestTypes,setRequestTypes]=useState<string[]>([]);
@@ -218,7 +218,7 @@ function CreateModal({profiles,category,onCategory,busy,onClose,onSubmit}:{profi
      <option value="">Seçin</option>{field.options.map(option=><option key={option}>{option}</option>)}
     </select>:field.multiline?<textarea required={field.required} maxLength={2500} rows={3} placeholder={field.example} value={fields[field.label]??''} onChange={e=>setFields({...fields,[field.label]:e.target.value})}/>:<input required={field.required} maxLength={500} placeholder={field.example} value={fields[field.label]??''} onChange={e=>setFields({...fields,[field.label]:e.target.value})}/>}
    </label>)}
-<div className="form-grid"><label>Müşteri / marka<input required maxLength={100} value={input.brand} placeholder="Marka adı veya İç Ekip" onChange={e=>setInput({...input,brand:e.target.value})}/></label><label>Sorumlu<select value={input.assignee_id??''} onChange={e=>setInput({...input,assignee_id:e.target.value||null})}><option value="">Henüz atanmadı</option>{assignableProfiles(profiles,category).map(p=><option key={p.id} value={p.id}>{p.name} · {p.team}</option>)}</select></label><label>Teslim tarihi<input required type="date" value={input.due_date} onChange={e=>setInput({...input,due_date:e.target.value})}/></label><label>Öncelik<select value={input.priority} onChange={e=>setInput({...input,priority:e.target.value as TaskInput['priority']})}>{['Normal','Yüksek','Acil'].map(s=><option key={s}>{s}</option>)}</select></label></div><fieldset className="request-files">
+<div className="form-grid"><label>Müşteri / marka<input required maxLength={100} value={input.brand} placeholder="Marka adı veya İç Ekip" onChange={e=>setInput({...input,brand:e.target.value})}/></label><label>Sorumlu<select value={input.assignee_id??''} onChange={e=>setInput({...input,assignee_id:e.target.value||null})}><option value="">Henüz atanmadı</option>{assignableProfiles(profiles,category).map(p=><option key={p.id} value={p.id}>{p.name} · {p.team}</option>)}</select></label></div><fieldset className="priority-picker"><legend>Öncelik</legend><div role="radiogroup" aria-label="Öncelik">{priorities.map(s=><button type="button" role="radio" aria-checked={input.priority===s} key={s} className={'prio-chip '+priorityClass(s)+(input.priority===s?' selected':'')} onClick={()=>setInput({...input,priority:s})}>{s}</button>)}</div></fieldset><fieldset className="request-files">
  <legend>{brief.attachmentLabel}</legend>
  <small>{files.length} / {maxRequestFiles} dosya · PDF, PNG, JPG, WebP · dosya başına en fazla 20 MB</small>
  {files.map((file,index)=><div className="picked-file" key={index}>

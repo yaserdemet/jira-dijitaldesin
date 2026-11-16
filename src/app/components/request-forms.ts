@@ -37,7 +37,6 @@ export const requestForms: Record<Category, RequestForm> = {
     types: [],
     fields: [
       {label:'Domain',required:true,example:'ornek.com'},
-      {label:'Mevcut durum veya hata mesajı',required:true,multiline:true},
     ],
   },
   'Diğer Talepler': {
@@ -47,8 +46,6 @@ export const requestForms: Record<Category, RequestForm> = {
     types: ['Bilgi ve belge', 'Onay ve geri bildirim', 'Koordinasyon', 'Operasyon', 'Diğer'],
     fields: [
       {label:'İstenen iş veya çıktı',required:true,multiline:true},
-      {label:'İlgili ekip veya kişi'},
-      {label:'Bağlam, bağlantılar ve bağımlılıklar',multiline:true},
     ],
   },
 };

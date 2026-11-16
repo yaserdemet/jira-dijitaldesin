@@ -26,7 +26,7 @@ create table public.tasks (
  priority text not null default 'Normal' check(priority in ('Normal','Yüksek','Acil')),
  status text not null default 'Yeni' check(status in ('Yeni','Atandı','İşlemde','Bilgi Bekliyor','Onay Bekliyor','Revize İstendi','Tamamlandı','İptal')),
  creator_id uuid not null references public.profiles(id), assignee_id uuid references public.profiles(id),
- due_date date not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
  completed_at timestamptz, revision_count integer not null default 0 check(revision_count>=0)
 );
 create table public.messages (
@@ -147,7 +147,7 @@ alter table public.task_events enable row level security;
 revoke all on public.profiles,public.tasks,public.messages,public.attachments,public.audit_logs,public.task_events from anon,authenticated;
 grant select on public.profiles,public.tasks,public.messages,public.attachments,public.task_events,public.audit_logs to authenticated;
 grant insert on public.tasks,public.messages,public.attachments to authenticated;
-grant update(title,description,category,brand,priority,status,assignee_id,due_date) on public.tasks to authenticated;
+grant update(title,description,category,brand,priority,status,assignee_id) on public.tasks to authenticated;
 grant usage,select on sequence public.tasks_number_seq to authenticated;
 create policy member_profiles on public.profiles for select to authenticated using(public.is_member());
 create policy member_tasks on public.tasks for select to authenticated using(public.is_member());
