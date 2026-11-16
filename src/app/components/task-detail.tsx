@@ -198,7 +198,7 @@ function StatusForm({ task, p }: { task: Task; p: Props }) {
         />
       </div>
       {state === 'Sorun Var' && (
-        <div className="motion-reveal grid gap-2">
+        <div className="grid gap-2">
           <Label htmlFor="status-problem">Sorunun nedeni</Label>
           <Textarea id="status-problem" required minLength={3} maxLength={10000} value={problem} onChange={e => setProblem(e.target.value)} />
         </div>
@@ -257,7 +257,7 @@ function Conversation({ task, p }: { task: Task; p: Props }) {
         }}
       >
         {parent && (
-          <div className="motion-reveal flex items-center justify-between rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground">
+          <div className="flex items-center justify-between rounded-md bg-accent px-3 py-1.5 text-sm text-accent-foreground">
             Bir yoruma yanıt yazıyorsun.
             <Button type="button" variant="ghost" size="xs" onClick={() => { setParent(null); setRecipient(''); }}>Vazgeç</Button>
           </div>
@@ -297,7 +297,7 @@ function Revision({ task, p }: { task: Task; p: Props }) {
   }
   return (
     <form
-      className="motion-reveal mt-3 grid gap-2 rounded-lg border p-3"
+      className="mt-3 grid gap-2 rounded-lg border p-3"
       onSubmit={async e => {
         e.preventDefault();
         if (await p.onUpdate(task, { status: 'Revize İstendi' }, { body: reason, kind: 'revision' })) { setReason(''); setOpen(false); }

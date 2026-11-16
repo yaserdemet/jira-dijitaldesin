@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { DndContext, DragOverlay, type DropAnimation, PointerSensor, pointerWithin, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, PointerSensor, pointerWithin, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Archive, MessageSquare } from 'lucide-react';
 import { type Profile, type Task, canEdit } from '@/lib/domain';
 import { type WorkflowState, categoryLabels, taskProgress, workflowPatch, workflowState, workflowStates } from '@/lib/workflow';
@@ -23,7 +23,7 @@ export function StateRail({ counts, filter, onFilter }: { counts: Record<Workflo
         {total > 0 && workflowStates.map(s => counts[s] > 0 && (
           <span
             key={s}
-            className={cn('h-full transition-opacity duration-200 ease-out', stateStyle[s].bar, filter !== 'Tümü' && filter !== s && 'opacity-25')}
+            className={cn('h-full transition-[flex-grow,opacity] duration-300', stateStyle[s].bar, filter !== 'Tümü' && filter !== s && 'opacity-25')}
             style={{ flexGrow: counts[s] }}
           />
         ))}
@@ -61,44 +61,29 @@ export function Board({ tasks, p, open }: { tasks: Task[]; p: Props; open: (t: T
   );
   const [dragging, setDragging] = useState<Task | null>(null);
   const [problem, setProblem] = useState<Task | null>(null);
-  const [overState, setOverState] = useState<WorkflowState | null>(null);
-  // Bırakılan kart, sunucu yanıtı gelene kadar yeni sütununda gösterilir (yalnızca görünüm).
-  // Kayıt `at` anındaki sürüme bağlı: veri yenilenince (updated_at değişince) bu kayıt yok sayılır.
-  const [moved, setMoved] = useState<Record<string, { state: WorkflowState; at: string }>>({});
-  const columnOf = (t: Task) => (moved[t.id]?.at === t.updated_at ? moved[t.id].state : workflowState(t));
 
   function end(e: DragEndEvent) {
     setDragging(null);
-    setOverState(null);
     const task = tasks.find(t => t.id === e.active.id), state = e.over?.id as WorkflowState | undefined;
-    if (!task || !state || columnOf(task) === state) return;
+    if (!task || !state || workflowState(task) === state) return;
     if (state === 'Sorun Var') { setProblem(task); return; }
-    setMoved(m => ({ ...m, [task.id]: { state, at: task.updated_at } }));
-    p.onUpdate(task, workflowPatch(state, taskProgress(task), '')).then(ok => {
-      if (!ok) setMoved(m => { const next = { ...m }; delete next[task.id]; return next; });
-    });
+    p.onUpdate(task, workflowPatch(state, taskProgress(task), ''));
   }
-
-  // Başka sütuna bırakınca kart geri uçmaz, yeni yerinde belirir; geçersiz bırakışta yerine döner.
-  const dropAnimation: DropAnimation | null = dragging && overState && overState !== columnOf(dragging) && overState !== 'Sorun Var'
-    ? null
-    : { duration: 200, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' };
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={e => setDragging(tasks.find(t => t.id === e.active.id) ?? null)}
-      onDragOver={e => setOverState((e.over?.id as WorkflowState | undefined) ?? null)}
       onDragEnd={end}
-      onDragCancel={() => { setDragging(null); setOverState(null); }}
+      onDragCancel={() => setDragging(null)}
     >
       <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {workflowStates.map(s => <Column key={s} state={s} tasks={tasks.filter(t => columnOf(t) === s)} landed={moved} p={p} open={open} />)}
+        {workflowStates.map(s => <Column key={s} state={s} tasks={tasks.filter(t => workflowState(t) === s)} p={p} open={open} />)}
       </div>
-      <DragOverlay dropAnimation={dropAnimation}>
+      <DragOverlay>
         {dragging && (
-          <article className="motion-pickup cursor-grabbing rounded-lg border bg-card p-3 shadow-xl shadow-foreground/10">
+          <article className="rotate-2 cursor-grabbing rounded-lg border bg-card p-3 shadow-xl shadow-foreground/10">
             <CardBody task={dragging} p={p} />
           </article>
         )}
@@ -108,7 +93,7 @@ export function Board({ tasks, p, open }: { tasks: Task[]; p: Props; open: (t: T
   );
 }
 
-function Column({ state, tasks, landed, p, open }: { state: WorkflowState; tasks: Task[]; landed: Record<string, unknown>; p: Props; open: (t: Task) => void }) {
+function Column({ state, tasks, p, open }: { state: WorkflowState; tasks: Task[]; p: Props; open: (t: Task) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: state });
   const archivable = state === 'Tamamlandı' ? tasks.filter(t => canEdit(t, p.person)) : [];
   return (
@@ -126,7 +111,7 @@ function Column({ state, tasks, landed, p, open }: { state: WorkflowState; tasks
         <span className="ml-auto text-sm font-semibold text-muted-foreground tabular-nums">{tasks.length}</span>
       </header>
       <div className="flex flex-col gap-2">
-        {tasks.map(t => <TaskCard key={t.id} task={t} landed={t.id in landed} p={p} open={() => open(t)} />)}
+        {tasks.map(t => <TaskCard key={t.id} task={t} p={p} open={() => open(t)} />)}
       </div>
       {!tasks.length && <p className="px-2 py-8 text-center text-sm text-muted-foreground">Bir kartı buraya sürükle</p>}
       {archivable.length > 0 && (
@@ -146,7 +131,7 @@ function Column({ state, tasks, landed, p, open }: { state: WorkflowState; tasks
   );
 }
 
-function TaskCard({ task, landed, p, open }: { task: Task; landed: boolean; p: Props; open: () => void }) {
+function TaskCard({ task, p, open }: { task: Task; p: Props; open: () => void }) {
   const can = canEdit(task, p.person);
   const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: task.id, disabled: !can || p.busy });
   return (
@@ -158,8 +143,7 @@ function TaskCard({ task, landed, p, open }: { task: Task; landed: boolean; p: P
       onClick={open}
       onKeyDown={e => { if (e.key === 'Enter') open(); }}
       className={cn(
-        'group rounded-lg border bg-card p-3 text-left outline-none transition-[border-color,opacity] duration-150 ease-[ease] hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring/50',
-        landed && 'motion-card-landed',
+        'group rounded-lg border bg-card p-3 text-left outline-none transition-[border-color,opacity] hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring/50',
         can ? 'cursor-grab' : 'cursor-pointer',
         isDragging && 'opacity-30',
       )}
