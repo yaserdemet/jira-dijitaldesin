@@ -127,5 +127,34 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   await db.query('delete from public.tasks where id=$1',[id]);
   assert.equal((await db.query('select 1 from public.tasks where id=$1',[id])).rows.length,0);
  });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/007_delete_employee.sql',import.meta.url),'utf8'));
+ await t.test('çalışan kalıcı silinir, geçmişi korunur',async()=>{
+  await login(0);
+  const open=await newTask('Diğer Talepler'), done=await newTask('Diğer Talepler');
+  await login(1);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[done]);
+  await db.query(`insert into public.messages(task_id,author_id,body) values($1,$2,'Teslim ettim')`,[done,ids[1]]);
+  await login(0);
+  await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Bakar mısın?',$3)`,[open,ids[0],ids[1]]);
+  // Yetki: çalışan silemez, süper admin kendini silemez.
+  await login(1);
+  await assert.rejects(db.query('select public.delete_employee($1)',[ids[1]]),/Süper admin/);
+  await login(0);
+  await assert.rejects(db.query('select public.delete_employee($1)',[ids[0]]),/silinemez/);
+  await db.query('select public.delete_employee($1)',[ids[1]]);
+  await db.query('select public.delete_employee($1)',[ids[1]]); // tekrar çağrı zararsız
+  await db.exec('reset role');
+  const p=(await db.query<{name:string;email:string;active:boolean;deleted_at:string|null}>('select name,email,active,deleted_at from public.profiles where id=$1',[ids[1]])).rows[0];
+  assert.deepEqual([p.name,p.email,p.active,!!p.deleted_at],['Silinmiş kullanıcı','',false,true]);
+  assert.equal((await db.query<{assignee_id:string|null}>('select assignee_id from public.tasks where id=$1',[open])).rows[0].assignee_id,null,'açık iş sahipsiz kalır');
+  assert.equal((await db.query<{assignee_id:string|null}>('select assignee_id from public.tasks where id=$1',[done])).rows[0].assignee_id,ids[1],'biten işte ad geçmiş olarak kalır');
+  assert.equal((await db.query("select 1 from public.messages where body='Teslim ettim'")).rows.length,1,'yorumlar korunur');
+  assert.equal((await db.query('select 1 from public.notifications where recipient_id=$1',[ids[1]])).rows.length,0,'bildirimleri silinir');
+  assert.ok((await db.query("select 1 from public.audit_logs where action='Kullanıcı kalıcı olarak silindi'")).rows.length);
+  // Giriş hesabı artık silinebilir (sunucu bunu Supabase Auth üzerinden yapar).
+  await db.query('delete from auth.users where id=$1',[ids[1]]);
+  assert.equal((await db.query('select 1 from public.profiles where id=$1',[ids[1]])).rows.length,1,'profil satırı kalır');
+ });
  }finally{await db.close()}
 });

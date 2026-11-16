@@ -420,7 +420,7 @@ function Team({ p, go }: { p: Props; go: (path: string) => void }) {
         {admin && <Button variant="ghost" className="ml-auto text-muted-foreground" onClick={() => go('/kayitlar')}>Denetim kayıtları</Button>}
       </div>
       <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {p.data.profiles.map(u => (
+        {p.data.profiles.filter(u => !u.deleted_at).map(u => (
           <li key={u.id} className={cn('flex flex-col rounded-xl border bg-card p-5', !u.active && 'bg-card/60')}>
             <div className="flex items-start gap-3">
               <Avatar name={u.name} size="lg" />
@@ -464,6 +464,14 @@ function Team({ p, go }: { p: Props; go: (path: string) => void }) {
                 ) : (
                   <Button variant="ghost" size="sm" className="ml-auto" disabled={p.busy} onClick={() => p.onActive(u)}>Erişimi yeniden aç</Button>
                 )}
+                <ConfirmAction
+                  destructive
+                  title={`${u.name} kalıcı olarak silinsin mi?`}
+                  description="Giriş hesabı, adı ve e-postası kalıcı olarak silinir; bir daha giriş yapamaz. Açtığı talepler ve yazdığı yorumlar kalır, adı yerine “Silinmiş kullanıcı” yazar. Üstlendiği açık işler sahipsiz kalır. Bu işlem geri alınamaz; aynı e-postayla yeni hesap açılabilir."
+                  confirmLabel="Kalıcı olarak sil"
+                  onConfirm={() => p.onDelete(u)}
+                  trigger={<Button variant="ghost" size="sm" className="w-full text-destructive hover:bg-destructive/8 hover:text-destructive" disabled={p.busy}>Kalıcı olarak sil</Button>}
+                />
               </div>
             )}
           </li>

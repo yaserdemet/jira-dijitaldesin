@@ -16,7 +16,8 @@ export async function POST(req:Request){
  z.object({action:z.literal('create'),email:z.email('Geçerli bir e-posta adresi girin.'),name:z.string().trim().min(2,'Ad soyad en az 2 karakter olmalı.').max(100),team:z.string().trim().min(1).max(100),password}),
  z.object({action:z.literal('password'),id:z.uuid(),password}),
  z.object({action:z.literal('responsibilities'),id:z.uuid(),technical:z.boolean(),design:z.boolean()}),
- z.object({action:z.literal('active'),id:z.uuid(),active:z.boolean()})]).parse(await req.json());
+ z.object({action:z.literal('active'),id:z.uuid(),active:z.boolean()}),
+ z.object({action:z.literal('delete'),id:z.uuid()})]).parse(await req.json());
  if(body.action==='create'){
  // E-posta gönderilmez; hesap doğrulanmış olarak açılır ve kullanıcı bu şifreyle giriş yapar.
  const {data,error}=await admin.auth.admin.createUser({email:body.email,password:body.password,email_confirm:true,user_metadata:{name:body.name,team:body.team}});
@@ -36,6 +37,16 @@ export async function POST(req:Request){
  const caller=createClient(url,key,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false,autoRefreshToken:false}});
  const {error}=await caller.rpc('set_department_assignees',{target_id:body.id,technical:body.technical,design:body.design});
  if(error)throw new Error(error.code==='PGRST202'?'Önce 004_department_assignees.sql geçişini uygulayın.':error.message);
+ } else if(body.action==='delete'){
+ // Önce veritabanında kişisel bilgiler silinir ve geçmiş korunur (007), sonra giriş hesabı kalıcı silinir.
+ if(body.id===user.id)return Response.json({error:'Kendi hesabınızı silemezsiniz.'},{status:400});
+ const {data:target}=await admin.from('profiles').select('role').eq('id',body.id).single();
+ if(!target||target.role==='super_admin')return Response.json({error:'Süper admin hesabı bu ekrandan silinemez.'},{status:400});
+ const caller=createClient(url,key,{global:{headers:{Authorization:`Bearer ${token}`}},auth:{persistSession:false,autoRefreshToken:false}});
+ const {error}=await caller.rpc('delete_employee',{target_id:body.id});
+ if(error)throw new Error(error.code==='PGRST202'?'Önce 007_delete_employee.sql geçişini uygulayın.':error.message);
+ const {error:authError}=await admin.auth.admin.deleteUser(body.id);
+ if(authError&&!/not.?found/i.test(authError.message))throw new Error('Kişisel bilgiler silindi ve erişim kapandı, ancak giriş hesabı silinemedi: '+authError.message+' İşlemi tekrar deneyebilirsiniz.');
  } else {
  if(body.id===user.id)return Response.json({error:'Kendi hesabınızı kapatamazsınız.'},{status:400});
  const {data:target}=await admin.from('profiles').select('role').eq('id',body.id).single();

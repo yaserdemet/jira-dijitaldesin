@@ -19,7 +19,7 @@ export type Props = {
   onDownload: (a: Attachment) => void; onRead: (ids: string[]) => Promise<boolean>;
   onGuide: (title: string, body: string) => Promise<boolean>;
   onResponsibilities: (id: string, technical: boolean, design: boolean) => Promise<boolean>;
-  onAddUser: () => void; onPassword: (p: Profile) => void; onActive: (p: Profile) => void;
+  onAddUser: () => void; onPassword: (p: Profile) => void; onActive: (p: Profile) => void; onDelete: (p: Profile) => void;
   error: string; toast: string;
 };
 
@@ -112,8 +112,9 @@ export function ConfirmAction({ trigger, title, description, confirmLabel, destr
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+          {/* Renk variant ile verilir: asChild sınıfları birleştirirken çakışanları ayıklamaz. */}
           <AlertDialogAction
-            className={cn(destructive && 'bg-destructive text-white hover:bg-destructive/90')}
+            variant={destructive ? 'destructive' : 'default'}
             onClick={() => { setOpen(false); onConfirm(); }}
           >
             {confirmLabel}

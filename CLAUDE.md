@@ -36,7 +36,8 @@ Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kal
 
 - Onay adımı yok: sorumlu işi doğrudan Tamamlandı yapabilir.
 - Revize yalnızca talep sahibi/süper admin tarafından, Yapılıyor veya Tamamlandı işe istenir.
-- İptali yalnızca talebi açan veya süper admin yapar; iptal edilen iş arşive gider. Silme yok, yalnızca arşiv.
+- İptali yalnızca talebi açan veya süper admin yapar; iptal edilen iş arşive gider. Uygulamadan iş silinmez, yalnızca arşivlenir (toplu silme `npm run temizle`).
+- Çalışan kalıcı silme (`delete_employee`, 007): giriş hesabı ve kişisel bilgiler silinir, profil satırı "Silinmiş kullanıcı" olarak kalır ki geçmiş bozulmasın; açık işlerden sorumluluk düşer. Süper admin ve kişinin kendisi silinemez. Silinenler (`deleted_at`) ekip listesinde görünmez.
 - Bölümde işaretli sorumlu yoksa herkes atanabilir; varsa yalnızca işaretli sorumlular.
 - Teslim tarihi yok (bilinçli olarak kaldırıldı).
 - Yetki kuralları **hem** istemcide (kullanıcıya erken hata) **hem** veritabanında (asıl güvence: RLS + tetikleyiciler) uygulanır. Yalnızca istemcide kontrol yeterli değildir.

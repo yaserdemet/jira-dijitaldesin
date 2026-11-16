@@ -43,7 +43,7 @@ Deneme modunda gerçek hesap açılmaz, e-posta gönderilmez. Kayıtlar localSto
 Giriş e-posta ve şifreyle yapılır. E-posta gönderilmez; iki aşamalı doğrulama yoktur. Çalışan hesaplarını süper admin uygulamadan açar ve şifreyi çalışana kendisi iletir.
 
 1. Hesapları ajansın sahip olduğu e-posta adresiyle açın. Bir Supabase projesi oluşturun; uygulama, veritabanı ve dosya depolama için uygun bölgeyi seçin.
-2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql`, `004_department_assignees.sql`, `005_archive_and_rules.sql` ve `006_drop_due_date.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
+2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql`, `004_department_assignees.sql`, `005_archive_and_rules.sql`, `006_drop_due_date.sql` ve `007_delete_employee.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
 3. Authentication ayarlarında **Allow new users to sign up** seçeneğini kapatın. Email sağlayıcısı (şifreyle giriş) açık kalmalı.
 4. Supabase **Authentication → Users → Add user** ile ilk yöneticiyi e-posta ve şifreyle oluşturun (**Auto Confirm User** işaretli). Ardından SQL Editor'da, doğru e-posta adresiyle çalıştırın:
 
@@ -57,7 +57,7 @@ where email = 'SIZIN_YONETICI_EPOSTANIZ';
 6. Vercel'de proje kökü olarak bu klasörü seçin, aynı ortam değişkenlerini ekleyin ve Next.js olarak yayınlayın. HTTPS alan adını bağlayın.
 7. Yönetici hesabıyla giriş yapın; çalışanları **Ekip → Kullanıcı ekle** üzerinden ekleyin.
 
-Hesaplar silinmez; erişimi kapatılır. Böylece eski işlerdeki talep sahibi, sorumlu ve yorum kayıtları korunur. İlk sürümde süper admin yetkisi uygulamadan dağıtılmaz; değişiklik yalnızca güvenilir veritabanı yöneticisi tarafından yapılır.
+Çalışanın erişimi kapatılabilir ya da çalışan kalıcı olarak silinebilir (Ekip → Kalıcı olarak sil). Kalıcı silmede giriş hesabı, ad ve e-posta silinir; açtığı talepler ve yorumları kalır, adı yerine "Silinmiş kullanıcı" yazar, üstlendiği açık işler sahipsiz kalır. İlk sürümde süper admin yetkisi uygulamadan dağıtılmaz; değişiklik yalnızca güvenilir veritabanı yöneticisi tarafından yapılır.
 
 ## Yetki modeli
 
@@ -69,7 +69,8 @@ Hesaplar silinmez; erişimi kapatılır. Böylece eski işlerdeki talep sahibi, 
 | Revize isteme | Talep sahibi | Tüm işler |
 | Çalışan ekleme, erişim açma/kapatma | Hayır | Evet |
 | Güvenlik denetim kayıtları | Hayır | Evet |
-| Geçmiş kayıt ve dosya silme | Hayır | İlk sürümde uygulamadan sunulmaz |
+| Çalışanı kalıcı silme (geçmiş korunur) | Hayır | Evet (süper admin hariç) |
+| Tamamlanan işleri toplu silme | Hayır | `npm run temizle` |
 
 Talep sahibi, sorumlu veya süper admin işi doğrudan tamamlayabilir. Teslim dosyaları ve çözüm açıklamaları işin içinde korunur. Revize açıklaması ve durum değişikliği tek veritabanı işlemi içinde kaydedilir. İş durumu güncellenirken önceki güncelleme zamanı kontrol edilir; eş zamanlı değişiklikte yeniden yükleme istenir.
 
