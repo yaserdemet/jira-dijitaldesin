@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canApprove,canEdit,validateFile,csvCell,taskSchema } from '../src/lib/domain';
+import { assignableProfiles,canManage,canEdit,validateFile,csvCell,taskSchema } from '../src/lib/domain';
+import { canRequestRevision,stateLabel } from '../src/lib/workflow';
 import {seed} from '../src/lib/seed';
-test('çalışan başkasının işini değiştiremez veya onaylayamaz',()=>{const d=seed();const t=d.tasks[0];assert.equal(canEdit(t,d.profiles[2]),false);assert.equal(canApprove(t,d.profiles[1]),false);assert.equal(canEdit(t,d.profiles[1]),true);assert.equal(canApprove(t,d.profiles[3]),true);assert.equal(canApprove(t,d.profiles[0]),true)});
+test('çalışan başkasının işini değiştiremez veya onaylayamaz',()=>{const d=seed();const t=d.tasks[0];assert.equal(canEdit(t,d.profiles[2]),false);assert.equal(canManage(t,d.profiles[1]),false);assert.equal(canEdit(t,d.profiles[1]),true);assert.equal(canManage(t,d.profiles[3]),true);assert.equal(canManage(t,d.profiles[0]),true)});
 test('dosya türü ve boyutu sınırlandırılır',()=>{assert.throws(()=>validateFile({name:'test.html',type:'text/html',size:200}));assert.throws(()=>validateFile({name:'test.png',type:'image/png',size:21*1024*1024}));assert.throws(()=>validateFile({name:'test.exe',type:'image/png',size:200}));assert.doesNotThrow(()=>validateFile({name:'test.pdf',type:'application/pdf',size:200}))});
 test('rapor dışa aktarımı elektronik tablo formüllerini etkisizleştirir',()=>{assert.equal(csvCell('=HYPERLINK("x")'),'"\'=HYPERLINK(""x"")"');assert.equal(csvCell('normal'),'"normal"')});
 test('boş brief ve bilinmeyen bölüm reddedilir',()=>{const t=seed().tasks[0];assert.equal(taskSchema.safeParse({...t,description:''}).success,false);assert.equal(taskSchema.safeParse({...t,category:'Yanlış'}).success,false)});
+test('bölüm sorumlusu yoksa tüm aktif çalışanlar atanabilir',()=>{const d=seed();const people=d.profiles.map(p=>({...p,technical_assignee:false,design_assignee:false}));assert.equal(assignableProfiles(people,'Teknik İşlemler').length,people.filter(p=>p.active).length);people[2].technical_assignee=true;assert.deepEqual(assignableProfiles(people,'Teknik İşlemler').map(p=>p.id),[people[2].id])});
+test('revize yalnızca çalışılan veya tamamlanan işe istenir; iptal ayrı gösterilir',()=>{assert.equal(canRequestRevision({status:'Atandı'}),false);assert.equal(canRequestRevision({status:'İşlemde'}),true);assert.equal(canRequestRevision({status:'Tamamlandı'}),true);assert.equal(stateLabel({status:'İptal'}),'İptal');assert.equal(stateLabel({status:'Revize İstendi'}),'Sorun Var')});

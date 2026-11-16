@@ -6,7 +6,9 @@
 
 - Grafik İşlemleri, Teknik İşlemler ve Diğer Talepler.
 - Talep açma, sorumlu atama, öncelik ve teslim tarihi.
-- Liste/pano görünümü, arama, durum ve öncelik filtreleri.
+- Trello tarzı pano: kartlar sütunlar (Bekliyor, Yapılıyor, Tamamlandı, Sorun Var) arasında sürüklenir; liste görünümü, arama ve öncelik filtresi.
+- İşlerim (bana atananlar) ve Açtıklarım (benim açtıklarım) görünümleri.
+- Tamamlanan işler arşivlenir; talep sahibi talebi iptal edebilir. Arşiv silinmez, raporlarda yer alır.
 - Yorum, çözüm açıklaması, teslim dosyaları ve açıklamalı revize.
 - Dört renkli durum ve ilerleme yüzdesi; revize sayacı ve önceki dosyaların korunması.
 - Tarih aralığıyla rapor ve ilerleme bilgisi içeren CSV dışa aktarımı.
@@ -41,7 +43,7 @@ Deneme modunda gerçek hesap açılmaz, e-posta gönderilmez. Kayıtlar localSto
 Giriş e-posta ve şifreyle yapılır. E-posta gönderilmez; iki aşamalı doğrulama yoktur. Çalışan hesaplarını süper admin uygulamadan açar ve şifreyi çalışana kendisi iletir.
 
 1. Hesapları ajansın sahip olduğu e-posta adresiyle açın. Bir Supabase projesi oluşturun; uygulama, veritabanı ve dosya depolama için uygun bölgeyi seçin.
-2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql` ve `004_department_assignees.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
+2. SQL Editor içinde yeni, boş projede sırasıyla `001_initial.sql`, `003_workflow.sql`, `004_department_assignees.sql` ve `005_archive_and_rules.sql` dosyalarını bir kez çalıştırın. (Eski `001` sürümüyle kurulmuş bir projeyse ayrıca `002_remove_mfa_and_invite.sql` dosyasını çalıştırın.)
 3. Authentication ayarlarında **Allow new users to sign up** seçeneğini kapatın. Email sağlayıcısı (şifreyle giriş) açık kalmalı.
 4. Supabase **Authentication → Users → Add user** ile ilk yöneticiyi e-posta ve şifreyle oluşturun (**Auto Confirm User** işaretli). Ardından SQL Editor'da, doğru e-posta adresiyle çalıştırın:
 
@@ -110,6 +112,8 @@ Nasıl Yapılır bölümünde çalışanlar metin tabanlı adım adım rehber ya
 
 Kontroller: `npm test`, `npm run typecheck`, `npm run build`.
 
+
+Arşiv/iptal ve güncel atama kuralları için 004 sonrasında `supabase/migrations/005_archive_and_rules.sql` dosyasını çalıştırın. Bir bölümde işaretli sorumlu yoksa o bölümün işleri her aktif çalışana atanabilir; revize yalnızca üzerinde çalışılan veya tamamlanan işe istenebilir.
 
 Bölüm sorumluluklarını etkinleştirmek için mevcut Supabase veritabanında 003 sonrasında
 `supabase/migrations/004_department_assignees.sql` dosyasını çalıştırın.

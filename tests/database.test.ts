@@ -69,5 +69,45 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   await assert.rejects(db.query(create,[ids[0],ids[1]]),/aktif sorumluları/);
   await db.query("update public.tasks set progress=100 where id=$1",[taskId]);
  });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/005_archive_and_rules.sql',import.meta.url),'utf8'));
+ const newTask=async(category:string)=>(await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,assignee_id,due_date,status,archived_at) values('Yeni iş','Örnek açıklama',$1,'İç Ekip',$2,$3,'2026-12-01','Atandı',now()) returning id`,[category,ids[0],ids[1]])).rows[0].id;
+ const row=async(id:string)=>(await db.query<{status:string;progress:number;archived_at:string|null;updated_at:string}>('select status,progress,archived_at,updated_at from public.tasks where id=$1',[id])).rows[0];
+ await t.test('bölümde işaretli sorumlu yoksa herkes, varsa yalnızca sorumlular atanabilir',async()=>{
+  await login(0);
+  await newTask('Teknik İşlemler');
+  await db.query('select public.set_department_assignees($1,true,false)',[ids[0]]);
+  await assert.rejects(newTask('Teknik İşlemler'),/aktif sorumluları/);
+  await db.query('select public.set_department_assignees($1,false,false)',[ids[0]]);
+ });
+ await t.test('yalnızca tamamlanan iş arşivlenir, yeniden açılan iş arşivden çıkar',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  assert.equal((await row(id)).archived_at,null,'yeni iş arşivde açılamaz');
+  await login(1);
+  await assert.rejects(db.query('update public.tasks set archived_at=now() where id=$1',[id]),/arşivlenebilir/);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[id]);
+  await db.query('update public.tasks set archived_at=now() where id=$1',[id]);
+  assert.ok((await row(id)).archived_at);
+  await db.query("update public.tasks set status='İşlemde',progress=50 where id=$1",[id]);
+  assert.equal((await row(id)).archived_at,null);
+ });
+ await t.test('talebi yalnızca açan kişi iptal eder ve iptal edilen iş arşive gider',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await login(1);
+  await assert.rejects(db.query("update public.tasks set status='İptal',archived_at=now() where id=$1",[id]),/iptal/);
+  await login(0);
+  await db.query("update public.tasks set status='İptal',archived_at=now() where id=$1",[id]);
+  const r=await row(id);assert.equal(r.status,'İptal');assert.ok(r.archived_at);
+ });
+ await t.test('başlanmamış işe revize istenemez; tamamlanmış işin revizesi onu arşivden çıkarır',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await assert.rejects(db.query('select public.request_revision($1,$2,$3)',[id,'Renkleri değiştir',(await row(id)).updated_at]),/Revize yalnızca/);
+  await login(1);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[id]);
+  await db.query('update public.tasks set archived_at=now() where id=$1',[id]);
+  await login(0);
+  await db.query('select public.request_revision($1,$2,$3)',[id,'Renkleri değiştir',(await row(id)).updated_at]);
+  const r=await row(id);assert.equal(r.status,'Revize İstendi');assert.equal(r.progress,90);assert.equal(r.archived_at,null);
+ });
  }finally{await db.close()}
 });
