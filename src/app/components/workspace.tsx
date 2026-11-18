@@ -209,6 +209,20 @@ export default function Workspace(){
   await load();notify('Mesaj eklendi.');
  }
  async function markRead(ids:string[]){const now=new Date().toISOString();if(demo){const next=notices.map(n=>ids.includes(n.id)&&n.recipient_id===person!.id?{...n,read_at:now}:n);setNotices(next);localStorage.setItem('akis-demo-notices',JSON.stringify(next))}else{const {error}=await supabase!.from('notifications').update({read_at:now}).in('id',ids).eq('recipient_id',person!.id);if(error)throw error;await load()}}
+ // Denetim kayıtlarını kalıcı siler; veritabanı yalnızca süper admin'e izin verir ve silme işlemini tek kayıtla iz olarak bırakır.
+ async function clearLogs(){
+  if(person?.role!=='super_admin')throw new Error('Denetim kayıtlarını yalnızca süper admin silebilir.');
+  if(demo){
+   const removed=demoData.current.logs.length;
+   commit({...demoData.current,logs:[log('Denetim kayıtları silindi',person.id,removed+' kayıt kalıcı olarak silindi')]});
+   notify(removed+' denetim kaydı silindi.');
+   return;
+  }
+  const {data:removed,error}=await supabase!.rpc('clear_audit_logs');
+  if(error)throw new Error(error.code==='PGRST202'?'Önce 009_clear_audit_logs.sql geçişini uygulayın.':'Denetim kayıtları silinemedi: '+error.message);
+  await load();
+  notify(removed+' denetim kaydı silindi.');
+ }
  async function addGuide(title:string,body:string){if(title.trim().length<3||body.trim().length<10)throw new Error('Başlık ve rehber adımlarını doldurun.');const guide={id:uid(),title:title.trim(),body:body.trim(),author_id:person!.id,created_at:new Date().toISOString()};if(demo){const next=[guide,...guides];setGuides(next);localStorage.setItem('akis-demo-guides',JSON.stringify(next));commit({...demoData.current,logs:[log('Rehber yayımlandı',guide.id,title),...demoData.current.logs]})}else{const {error}=await supabase!.from('guides').insert(guide);if(error)throw error;await load()}notify('Rehber yayımlandı.')}
  async function upload(taskId:string,file:File,kind:Attachment['kind']){
   validateFile(file);const id=uid();const path=`${person!.id}/${taskId}/${id}.${file.name.split('.').pop()!.toLowerCase()}`;
@@ -227,7 +241,7 @@ export default function Workspace(){
  if(!person)return <Login busy={busy} configured={!!supabase} allowDemo={demoAllowed} onDemo={startDemo} error={error} run={run} session={session} onLogout={()=>run(async()=>{await supabase?.auth.signOut();setSession(null);setError('')})}/>;
  const clearError=()=>setError('');
  return <>
-  <WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={creating||addingUser||pwTarget?'':error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>navigate('/yeni?kategori='+encodeURIComponent(c))} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onArchive={ts=>run(()=>archiveTasks(ts))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onResponsibilities={(id,technical,design)=>run(()=>adminAction({action:"responsibilities",id,technical,design}))} onAddUser={()=>setAddingUser(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))} onDelete={p=>run(()=>adminAction({action:'delete',id:p.id}))}/>
+  <WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={creating||addingUser||pwTarget?'':error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>navigate('/yeni?kategori='+encodeURIComponent(c))} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onArchive={ts=>run(()=>archiveTasks(ts))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onClearLogs={()=>run(clearLogs)} onResponsibilities={(id,technical,design)=>run(()=>adminAction({action:"responsibilities",id,technical,design}))} onAddUser={()=>setAddingUser(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))} onDelete={p=>run(()=>adminAction({action:'delete',id:p.id}))}/>
   {creating&&<CreateDialog key={createCategory} profiles={data.profiles} category={createCategory} onCategory={c=>{history.replaceState(null,'','/yeni?kategori='+encodeURIComponent(c));setCreateCategory(c)}} busy={busy} error={error} onClearError={clearError} onClose={()=>{setCreating(false);navigate('/')}} onSubmit={(input,files)=>run(()=>createTask(input,files))}/>}
   {addingUser&&<AddUserDialog busy={busy} demo={demo} error={error} onClearError={clearError} onClose={()=>setAddingUser(false)} onSubmit={b=>run(()=>adminAction(b))}/>}
   {pwTarget&&<PasswordDialog busy={busy} target={pwTarget} self={pwTarget.id===person.id} error={error} onClearError={clearError} onClose={()=>setPwTarget(null)} onSubmit={pw=>run(()=>changePassword(pwTarget,pw))}/>}

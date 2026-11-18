@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Archive, ArrowLeft, Bell, BookOpen, Check, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Wrench } from 'lucide-react';
+import { Archive, ArrowLeft, Bell, BookOpen, Check, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Trash2, Wrench } from 'lucide-react';
 import { type Task, canAssignCategory, reportCsv } from '@/lib/domain';
 import { type Notice, type WorkflowState, categoryLabels, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
@@ -302,7 +302,24 @@ export default function WorkflowScreen(p: Props) {
         {settingsPage && <ThemeSettingsPage person={p.person} />}
 
         {logs && (
-          <Panel className="max-w-4xl">
+          <Panel
+            className="max-w-4xl"
+            title={p.person.role === 'super_admin' ? `${p.data.logs.length} kayıt` : undefined}
+            action={p.person.role === 'super_admin' && p.data.logs.length > 0 ? (
+              <ConfirmAction
+                destructive
+                title="Denetim kayıtları kalıcı olarak silinsin mi?"
+                description={`${p.data.logs.length} kayıt veritabanından kalıcı olarak silinecek. Bu işlem geri alınamaz. Yerine yalnızca kimin, ne zaman ve kaç kayıt sildiğini gösteren tek bir kayıt kalır.`}
+                confirmLabel="Kalıcı olarak sil"
+                onConfirm={() => p.onClearLogs()}
+                trigger={
+                  <Button variant="outline" size="sm" className="text-destructive" disabled={p.busy}>
+                    <Trash2 /> Kayıtları sil
+                  </Button>
+                }
+              />
+            ) : undefined}
+          >
             {p.person.role === 'super_admin' ? (
               <ul className="divide-y">
                 {p.data.logs.map(l => (
