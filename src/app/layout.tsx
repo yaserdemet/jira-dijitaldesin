@@ -1,4 +1,27 @@
 import type { Metadata } from 'next';
+import { Bricolage_Grotesque, Instrument_Sans } from 'next/font/google';
+import { themeBootScript } from '@/lib/theme';
 import './globals.css';
-export const metadata: Metadata = {title:'Akış — Ajans çalışma alanı',description:'Ajansınızın tüm işleri, aynı akışta.',robots:{index:false,follow:false}};
-export default function RootLayout({children}:{children:React.ReactNode}) { return <html lang="tr"><body>{children}</body></html> }
+
+// Başlıklar için karakterli bir grotesk, arayüz için sakin bir sans. İkisi de Türkçe karakterleri içerir.
+const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], variable: '--font-brand-display' });
+const ui = Instrument_Sans({ subsets: ['latin', 'latin-ext'], variable: '--font-brand-ui' });
+
+export const metadata: Metadata = {
+  title: 'Akış · dijitaldesin',
+  description: 'Ajansın talepleri tek panoda.',
+  robots: { index: false, follow: false },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    // Tema betiği <html>'e data-base/data-accent yazar; sunucu çıktısıyla farkı beklenen bir durum.
+    <html lang="tr" className={`${display.variable} ${ui.variable}`} suppressHydrationWarning>
+      {/* Bazı tarayıcı eklentileri <head>e öznitelik ekliyor; bu uyuşmazlık bizim kodumuzdan değil. */}
+      <head suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
+}

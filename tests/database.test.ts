@@ -6,12 +6,11 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
  const db=new PGlite();
  const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333','44444444-4444-4444-8444-444444444444'];
  const taskId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
- const login=async(i:number)=>{await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${ids[i]}',false);select set_config('request.jwt.claim.aal','aal2',false)`)};
+ const login=async(i:number)=>{await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','${ids[i]}',false)`)};
  try {
  await db.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
- create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}',invited_at timestamptz);
+ create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
- create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('aal',current_setting('request.jwt.claim.aal',true))$$;
  grant usage on schema auth,public,storage to authenticated;
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text,metadata jsonb);
@@ -20,16 +19,17 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
  create function storage.foldername(text) returns text[] language sql immutable as $$ select (string_to_array($1,'/'))[1:array_length(string_to_array($1,'/'),1)-1] $$;
  create function storage.extension(text) returns text language sql immutable as $$ select reverse(split_part(reverse($1),'.',1)) $$;`);
  await db.exec(await readFile(new URL('../supabase/migrations/001_initial.sql',import.meta.url),'utf8'));
- await db.exec(await readFile(new URL('../supabase/migrations/002_disable_mfa.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/002_remove_mfa_and_invite.sql',import.meta.url),'utf8'));
  for(let i=0;i<4;i++){
   await db.query(`insert into auth.users(id,email,raw_user_meta_data) values($1,$2,$3)`,[ids[i],`user${i}@example.test`,JSON.stringify({name:`User ${i}`})]);
-  if(i!==3)await db.query('update auth.users set invited_at=now() where id=$1',[ids[i]]);
+  // Uygulamadaki API gibi: hesap pasif açılır, süper admin işlemiyle etkinleştirilir.
+  if(i!==3)await db.query('update public.profiles set active=true where id=$1',[ids[i]]);
  }
  await db.exec(`update public.profiles set role='super_admin' where id='${ids[0]}'`);
  await login(0);
- await db.query(`insert into public.tasks(id,title,description,category,brand,creator_id,assignee_id,due_date,status) values($1,'Görsel hazırla','Kampanya görsellerini hazırla','Grafik İşlemleri','Test',$2,$3,'2026-12-01','Atandı')`,[taskId,ids[0],ids[1]]);
- await t.test('yalnızca e-posta oturumu (aal1) ile aktif üye verilere erişir',async()=>{await login(0);await db.exec("select set_config('request.jwt.claim.aal','aal1',false)");assert.equal((await db.query('select * from public.tasks')).rows.length,1)});
- await t.test('davet edilmemiş hesap tüm verilere kapalı',async()=>{await login(3);assert.equal((await db.query('select * from public.tasks')).rows.length,0);assert.equal((await db.query('select * from public.profiles')).rows.length,0);await assert.rejects(db.query(`insert into public.messages(task_id,author_id,body) values($1,$2,'test')`,[taskId,ids[3]]))});
+ await db.query(`insert into public.tasks(id,title,description,category,brand,creator_id,assignee_id,status) values($1,'Görsel hazırla','Kampanya görsellerini hazırla','Grafik İşlemleri','Test',$2,$3,'Atandı')`,[taskId,ids[0],ids[1]]);
+ await t.test('yeni kayıt pasif açılır; aktif üye ek doğrulama olmadan verilere erişir',async()=>{await db.exec('reset role');assert.equal((await db.query<{active:boolean}>('select active from public.profiles where id=$1',[ids[3]])).rows[0].active,false);await login(0);assert.equal((await db.query('select * from public.tasks')).rows.length,1)});
+ await t.test('etkinleştirilmemiş hesap tüm verilere kapalı',async()=>{await login(3);assert.equal((await db.query('select * from public.tasks')).rows.length,0);assert.equal((await db.query('select * from public.profiles')).rows.length,0);await assert.rejects(db.query(`insert into public.messages(task_id,author_id,body) values($1,$2,'test')`,[taskId,ids[3]]))});
  await t.test('çalışan tüm işleri görür ama güvenlik loglarını göremez',async()=>{await login(1);assert.equal((await db.query('select * from public.tasks')).rows.length,1);assert.equal((await db.query('select * from public.audit_logs')).rows.length,0);assert.ok((await db.query('select * from public.task_events')).rows.length>0)});
  await t.test('çalışan kendi rolünü yükseltemez veya sahte log yazamaz',async()=>{await login(1);await assert.rejects(db.exec(`update public.profiles set role='super_admin' where id='${ids[1]}'`));await assert.rejects(db.exec("insert into public.audit_logs(action,entity_id) values('sahte','x')"));await assert.rejects(db.query('select public.set_employee_active($1,false)',[ids[2]]))});
  await t.test('ilgisiz çalışan işi değiştiremez',async()=>{await login(2);const r=await db.query('update public.tasks set status=\'İşlemde\' where id=$1 returning id',[taskId]);assert.equal(r.rows.length,0);await assert.rejects(db.query(`insert into public.messages(task_id,author_id,body,kind) values($1,$2,'Teslim','delivery')`,[taskId,ids[2]]))});
@@ -52,7 +52,7 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
  await t.test('yeni akış geçişi geçmişi ve tamamlanmayı korur',async()=>{await login(0);const row=(await db.query<{progress:number;revision_count:number}>('select progress,revision_count from public.tasks where id=$1',[taskId])).rows[0];assert.equal(row.progress,100);assert.equal(row.revision_count,1);assert.ok((await db.query('select * from public.audit_logs')).rows.length>0);await db.query('select public.set_employee_active($1,true)',[ids[1]])});
  await t.test('dört durum, sorun açıklaması ve ilerleme sunucuda korunur',async()=>{await login(1);await assert.rejects(db.query("update public.tasks set status='Bilgi Bekliyor',issue_description='' where id=$1",[taskId]));await db.query("update public.tasks set status='İşlemde',progress=40 where id=$1",[taskId]);await db.query("update public.tasks set status='Bilgi Bekliyor',issue_description='Sunucu erişimi gerekiyor' where id=$1",[taskId]);assert.equal((await db.query<{progress:number}>('select progress from public.tasks where id=$1',[taskId])).rows[0].progress,40);await db.query("update public.tasks set status='Tamamlandı',progress=30 where id=$1",[taskId]);assert.equal((await db.query<{progress:number}>('select progress from public.tasks where id=$1',[taskId])).rows[0].progress,100)});
  await t.test('yorum bildirimi yalnızca alıcıya görünür ve yalnızca okundu bilgisi değişir',async()=>{await login(0);await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Kontrol eder misin?',$3)`,[taskId,ids[0],ids[2]]);await login(2);const notices=await db.query<{id:string}>('select id from public.notifications');assert.equal(notices.rows.length,1);await db.query('update public.notifications set read_at=now() where id=$1',[notices.rows[0].id]);await assert.rejects(db.query("update public.notifications set body='sahte' where id=$1",[notices.rows[0].id]));await assert.rejects(db.query("insert into public.notifications(recipient_id,task_id,body) values($1,$2,'sahte')",[ids[0],taskId]));await login(1);assert.equal((await db.query('select * from public.notifications where recipient_id=$1',[ids[2]])).rows.length,0)});
- await t.test('yanıt alıcısı sunucuda asıl yazardır, farklı talebe yanıt engellenir',async()=>{await login(2);const original=(await db.query<{id:string}>("select id from public.messages where body='Kontrol eder misin?'")).rows[0];const reply=await db.query<{recipient_id:string}>(`insert into public.messages(task_id,author_id,body,parent_id,recipient_id) values($1,$2,'Kontrol ettim',$3,$4) returning recipient_id`,[taskId,ids[2],original.id,ids[1]]);assert.equal(reply.rows[0].recipient_id,ids[0]);await login(0);const other=(await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,due_date,status) values('Yeni talep','Başka bir görev','Diğer Talepler','İç Ekip',$1,'2026-12-01','Yeni') returning id`,[ids[0]])).rows[0];await assert.rejects(db.query(`insert into public.messages(task_id,author_id,body,parent_id) values($1,$2,'Hatalı yanıt',$3)`,[other.id,ids[0],original.id]));const before=(await db.query('select * from public.notifications')).rows.length;await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Kendime not',$2)`,[taskId,ids[0]]);assert.equal((await db.query('select * from public.notifications')).rows.length,before)});
+ await t.test('yanıt alıcısı sunucuda asıl yazardır, farklı talebe yanıt engellenir',async()=>{await login(2);const original=(await db.query<{id:string}>("select id from public.messages where body='Kontrol eder misin?'")).rows[0];const reply=await db.query<{recipient_id:string}>(`insert into public.messages(task_id,author_id,body,parent_id,recipient_id) values($1,$2,'Kontrol ettim',$3,$4) returning recipient_id`,[taskId,ids[2],original.id,ids[1]]);assert.equal(reply.rows[0].recipient_id,ids[0]);await login(0);const other=(await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,status) values('Yeni talep','Başka bir görev','Diğer Talepler','İç Ekip',$1,'Yeni') returning id`,[ids[0]])).rows[0];await assert.rejects(db.query(`insert into public.messages(task_id,author_id,body,parent_id) values($1,$2,'Hatalı yanıt',$3)`,[other.id,ids[0],original.id]));const before=(await db.query('select * from public.notifications')).rows.length;await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Kendime not',$2)`,[taskId,ids[0]]);assert.equal((await db.query('select * from public.notifications')).rows.length,before)});
  await t.test('rehberler üyelerce paylaşılır, yazar taklidi ve anonim erişim engellenir',async()=>{await login(1);await db.query(`insert into public.guides(title,body,author_id) values('Dosya teslimi','Önce talebi açın ve teslim dosyasını seçin.',$1)`,[ids[1]]);await assert.rejects(db.query(`insert into public.guides(title,body,author_id) values('Sahte rehber','Yazarı taklit etmeyi dene.',$1)`,[ids[0]]));await login(2);assert.equal((await db.query('select * from public.guides')).rows.length,1);await login(0);await db.query('select public.set_employee_active($1,false)',[ids[2]]);await login(2);assert.equal((await db.query('select * from public.notifications')).rows.length,0);assert.equal((await db.query('select * from public.guides')).rows.length,0)});
  await db.exec('reset role');
  await db.exec(await readFile(new URL('../supabase/migrations/004_department_assignees.sql',import.meta.url),'utf8'));
@@ -61,13 +61,100 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   await assert.rejects(db.query('select public.set_department_assignees($1,true,false)',[ids[1]]),/Süper admin/);
   await login(0);
   await assert.rejects(db.query('select public.set_department_assignees($1,true,false)',[ids[2]]),/Aktif kullanıcı/);
-  const create="insert into public.tasks(title,description,category,brand,creator_id,assignee_id,due_date) values('Teknik talep','Örnek açıklama','Teknik İşlemler','İç Ekip',$1,$2,'2026-12-01')";
+  const create="insert into public.tasks(title,description,category,brand,creator_id,assignee_id) values('Teknik talep','Örnek açıklama','Teknik İşlemler','İç Ekip',$1,$2)";
   await assert.rejects(db.query(create,[ids[0],ids[1]]),/aktif sorumluları/);
   await db.query('select public.set_department_assignees($1,true,false)',[ids[1]]);
   await db.query(create,[ids[0],ids[1]]);
   await db.query('select public.set_department_assignees($1,false,false)',[ids[1]]);
   await assert.rejects(db.query(create,[ids[0],ids[1]]),/aktif sorumluları/);
   await db.query("update public.tasks set progress=100 where id=$1",[taskId]);
+ });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/005_archive_and_rules.sql',import.meta.url),'utf8'));
+ const newTask=async(category:string)=>(await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,assignee_id,status,archived_at) values('Yeni iş','Örnek açıklama',$1,'İç Ekip',$2,$3,'Atandı',now()) returning id`,[category,ids[0],ids[1]])).rows[0].id;
+ const row=async(id:string)=>(await db.query<{status:string;progress:number;archived_at:string|null;updated_at:string}>('select status,progress,archived_at,updated_at from public.tasks where id=$1',[id])).rows[0];
+ await t.test('bölümde işaretli sorumlu yoksa herkes, varsa yalnızca sorumlular atanabilir',async()=>{
+  await login(0);
+  await newTask('Teknik İşlemler');
+  await db.query('select public.set_department_assignees($1,true,false)',[ids[0]]);
+  await assert.rejects(newTask('Teknik İşlemler'),/aktif sorumluları/);
+  await db.query('select public.set_department_assignees($1,false,false)',[ids[0]]);
+ });
+ await t.test('yalnızca tamamlanan iş arşivlenir, yeniden açılan iş arşivden çıkar',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  assert.equal((await row(id)).archived_at,null,'yeni iş arşivde açılamaz');
+  await login(1);
+  await assert.rejects(db.query('update public.tasks set archived_at=now() where id=$1',[id]),/arşivlenebilir/);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[id]);
+  await db.query('update public.tasks set archived_at=now() where id=$1',[id]);
+  assert.ok((await row(id)).archived_at);
+  await db.query("update public.tasks set status='İşlemde',progress=50 where id=$1",[id]);
+  assert.equal((await row(id)).archived_at,null);
+ });
+ await t.test('talebi yalnızca açan kişi iptal eder ve iptal edilen iş arşive gider',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await login(1);
+  await assert.rejects(db.query("update public.tasks set status='İptal',archived_at=now() where id=$1",[id]),/iptal/);
+  await login(0);
+  await db.query("update public.tasks set status='İptal',archived_at=now() where id=$1",[id]);
+  const r=await row(id);assert.equal(r.status,'İptal');assert.ok(r.archived_at);
+ });
+ await t.test('başlanmamış işe revize istenemez; tamamlanmış işin revizesi onu arşivden çıkarır',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await assert.rejects(db.query('select public.request_revision($1,$2,$3)',[id,'Renkleri değiştir',(await row(id)).updated_at]),/Revize yalnızca/);
+  await login(1);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[id]);
+  await db.query('update public.tasks set archived_at=now() where id=$1',[id]);
+  await login(0);
+  await db.query('select public.request_revision($1,$2,$3)',[id,'Renkleri değiştir',(await row(id)).updated_at]);
+  const r=await row(id);assert.equal(r.status,'Revize İstendi');assert.equal(r.progress,90);assert.equal(r.archived_at,null);
+ });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/006_drop_due_date.sql',import.meta.url),'utf8'));
+ await t.test('teslim tarihi kolonu yok ve talep tarihsiz açılır',async()=>{
+  assert.equal((await db.query("select 1 from information_schema.columns where table_schema='public' and table_name='tasks' and column_name='due_date'")).rows.length,0);
+  await login(0);assert.ok(await newTask('Diğer Talepler'));
+ });
+ await t.test('toplu temizlik (npm run temizle) sırası yabancı anahtarlara takılmaz',async()=>{
+  await login(0);const id=await newTask('Diğer Talepler');
+  await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Kontrol eder misin?',$3)`,[id,ids[0],ids[1]]);
+  await db.exec('reset role');
+  assert.ok((await db.query('select 1 from public.notifications where task_id=$1',[id])).rows.length>0,'bildirim oluşmalı');
+  // Eski sıra: bildirimler silinmeden yorum silinemez.
+  await assert.rejects(db.query('delete from public.messages where task_id=$1',[id]));
+  // scripts/temizle.ts sırası
+  for(const table of ['notifications','attachments','messages','task_events']) await db.query(`delete from public.${table} where task_id=$1`,[id]);
+  await db.query('delete from public.tasks where id=$1',[id]);
+  assert.equal((await db.query('select 1 from public.tasks where id=$1',[id])).rows.length,0);
+ });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/007_delete_employee.sql',import.meta.url),'utf8'));
+ await t.test('çalışan kalıcı silinir, geçmişi korunur',async()=>{
+  await login(0);
+  const open=await newTask('Diğer Talepler'), done=await newTask('Diğer Talepler');
+  await login(1);
+  await db.query("update public.tasks set status='Tamamlandı' where id=$1",[done]);
+  await db.query(`insert into public.messages(task_id,author_id,body) values($1,$2,'Teslim ettim')`,[done,ids[1]]);
+  await login(0);
+  await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Bakar mısın?',$3)`,[open,ids[0],ids[1]]);
+  // Yetki: çalışan silemez, süper admin kendini silemez.
+  await login(1);
+  await assert.rejects(db.query('select public.delete_employee($1)',[ids[1]]),/Süper admin/);
+  await login(0);
+  await assert.rejects(db.query('select public.delete_employee($1)',[ids[0]]),/silinemez/);
+  await db.query('select public.delete_employee($1)',[ids[1]]);
+  await db.query('select public.delete_employee($1)',[ids[1]]); // tekrar çağrı zararsız
+  await db.exec('reset role');
+  const p=(await db.query<{name:string;email:string;active:boolean;deleted_at:string|null}>('select name,email,active,deleted_at from public.profiles where id=$1',[ids[1]])).rows[0];
+  assert.deepEqual([p.name,p.email,p.active,!!p.deleted_at],['Silinmiş kullanıcı','',false,true]);
+  assert.equal((await db.query<{assignee_id:string|null}>('select assignee_id from public.tasks where id=$1',[open])).rows[0].assignee_id,null,'açık iş sahipsiz kalır');
+  assert.equal((await db.query<{assignee_id:string|null}>('select assignee_id from public.tasks where id=$1',[done])).rows[0].assignee_id,ids[1],'biten işte ad geçmiş olarak kalır');
+  assert.equal((await db.query("select 1 from public.messages where body='Teslim ettim'")).rows.length,1,'yorumlar korunur');
+  assert.equal((await db.query('select 1 from public.notifications where recipient_id=$1',[ids[1]])).rows.length,0,'bildirimleri silinir');
+  assert.ok((await db.query("select 1 from public.audit_logs where action='Kullanıcı kalıcı olarak silindi'")).rows.length);
+  // Giriş hesabı artık silinebilir (sunucu bunu Supabase Auth üzerinden yapar).
+  await db.query('delete from auth.users where id=$1',[ids[1]]);
+  assert.equal((await db.query('select 1 from public.profiles where id=$1',[ids[1]])).rows.length,1,'profil satırı kalır');
  });
  }finally{await db.close()}
 });

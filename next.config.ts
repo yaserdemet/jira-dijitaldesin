@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
 const config: NextConfig = {
   poweredByHeader: false,
+  // Tek derleme işçisi: az RAM'li makinede "Jest worker ... child process exceptions" çökmesini önler.
+  // Uygulamada yalnızca birkaç sayfa olduğu için derleme süresi pratikte değişmez.
+  experimental: { cpus: 1 },
   async headers() { return [{source: '/(.*)', headers: [
     {key:'X-Content-Type-Options',value:'nosniff'},
     {key:'Referrer-Policy',value:'strict-origin-when-cross-origin'},

@@ -9,6 +9,12 @@ export function workflowState(task: Pick<Task,'status'>): WorkflowState {
   if(['İşlemde','Onay Bekliyor'].includes(task.status)) return 'Yapılıyor';
   return 'Bekliyor';
 }
+// Kartta görünen ad: iptal edilen iş "Sorun Var" değil, "İptal" olarak gösterilir.
+export function stateLabel(task: Pick<Task,'status'>): string {return task.status==='İptal'?'İptal':workflowState(task)}
+// Revize yalnızca üzerinde çalışılan veya tamamlanan işe istenir.
+export function canRequestRevision(task: Pick<Task,'status'>) {return ['İşlemde','Onay Bekliyor','Tamamlandı'].includes(task.status)}
+// Öncelik etiketlerinin pastel renk sınıfı.
+export function priorityClass(priority: Task['priority']) {return priority==='Acil'?'urgent':priority==='Yüksek'?'high':'normal'}
 export function taskProgress(task: Task) {return task.status==='Tamamlandı'?100:task.progress??(workflowState(task)==='Yapılıyor'?50:0)}
 export function workflowPatch(state: WorkflowState, progress: number, problem: string): Partial<Task> {
   if(!workflowStates.includes(state)||!Number.isInteger(progress)||progress<0||progress>100) throw new Error('Geçerli bir durum ve ilerleme seçin.');

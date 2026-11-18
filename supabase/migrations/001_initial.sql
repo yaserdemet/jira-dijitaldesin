@@ -1,4 +1,5 @@
 -- Yeni Supabase projesinde SQL Editor üzerinden bir kez çalıştırın.
+-- Giriş e-posta + şifre ile yapılır; hesapları süper admin uygulamadan açar (profil pasif oluşur, API etkinleştirir).
 begin;
 create table public.profiles (
  id uuid primary key references auth.users(id), name text not null check(length(name) between 1 and 100),
@@ -6,26 +7,17 @@ create table public.profiles (
  active boolean not null default false, team text not null default 'Ekip', created_at timestamptz not null default now()
 );
 create function public.is_member() returns boolean language sql stable security definer set search_path = '' as $$
- select coalesce(auth.jwt()->>'aal','')='aal2' and exists(select 1 from public.profiles where id=auth.uid() and active);
+ select exists(select 1 from public.profiles where id=auth.uid() and active);
 $$;
 create function public.is_super_admin() returns boolean language sql stable security definer set search_path = '' as $$
  select public.is_member() and exists(select 1 from public.profiles where id=auth.uid() and active and role='super_admin');
 $$;
 create function public.on_auth_user_created() returns trigger language plpgsql security definer set search_path = '' as $$
 begin
- insert into public.profiles(id,name,email,team,active) values(new.id,left(coalesce(nullif(new.raw_user_meta_data->>'name',''),split_part(new.email,'@',1)),100),new.email,left(coalesce(new.raw_user_meta_data->>'team','Ekip'),100),new.invited_at is not null);
+ insert into public.profiles(id,name,email,team,active) values(new.id,left(coalesce(nullif(new.raw_user_meta_data->>'name',''),split_part(new.email,'@',1)),100),new.email,left(coalesce(new.raw_user_meta_data->>'team','Ekip'),100),false);
  return new;
 end;$$;
 create trigger auth_user_profile after insert on auth.users for each row execute function public.on_auth_user_created();
--- Auth daveti invited_at alanını kullanıcı insert işleminden sonra doldurabilir.
-create function public.on_auth_user_invited() returns trigger language plpgsql security definer set search_path = '' as $$
-begin
- if old.invited_at is null and new.invited_at is not null then
-  update public.profiles set active=true where id=new.id;
- end if;
- return new;
-end;$$;
-create trigger auth_user_invited after update of invited_at on auth.users for each row execute function public.on_auth_user_invited();
 create table public.tasks (
  id uuid primary key default gen_random_uuid(), number bigint generated always as identity(start with 1001) unique,
  title text not null check(length(trim(title)) between 3 and 180), description text not null check(length(trim(description)) between 5 and 10000),
@@ -34,7 +26,7 @@ create table public.tasks (
  priority text not null default 'Normal' check(priority in ('Normal','Yüksek','Acil')),
  status text not null default 'Yeni' check(status in ('Yeni','Atandı','İşlemde','Bilgi Bekliyor','Onay Bekliyor','Revize İstendi','Tamamlandı','İptal')),
  creator_id uuid not null references public.profiles(id), assignee_id uuid references public.profiles(id),
- due_date date not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
  completed_at timestamptz, revision_count integer not null default 0 check(revision_count>=0)
 );
 create table public.messages (
@@ -155,7 +147,7 @@ alter table public.task_events enable row level security;
 revoke all on public.profiles,public.tasks,public.messages,public.attachments,public.audit_logs,public.task_events from anon,authenticated;
 grant select on public.profiles,public.tasks,public.messages,public.attachments,public.task_events,public.audit_logs to authenticated;
 grant insert on public.tasks,public.messages,public.attachments to authenticated;
-grant update(title,description,category,brand,priority,status,assignee_id,due_date) on public.tasks to authenticated;
+grant update(title,description,category,brand,priority,status,assignee_id) on public.tasks to authenticated;
 grant usage,select on sequence public.tasks_number_seq to authenticated;
 create policy member_profiles on public.profiles for select to authenticated using(public.is_member());
 create policy member_tasks on public.tasks for select to authenticated using(public.is_member());
@@ -169,7 +161,7 @@ create policy admin_logs on public.audit_logs for select to authenticated using(
 create policy member_events on public.task_events for select to authenticated using(public.is_member());
 revoke all on function public.is_member(),public.is_super_admin(),public.can_edit_task(uuid),public.request_revision(uuid,text,timestamptz),public.set_employee_active(uuid,boolean) from public;
 grant execute on function public.is_member(),public.is_super_admin(),public.can_edit_task(uuid),public.request_revision(uuid,text,timestamptz),public.set_employee_active(uuid,boolean) to authenticated;
-revoke all on function public.on_auth_user_created(),public.on_auth_user_invited(),public.guard_task(),public.audit_task(),public.audit_content() from public;
+revoke all on function public.on_auth_user_created(),public.guard_task(),public.audit_task(),public.audit_content() from public;
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('task-files','task-files',false,20971520,array['application/pdf','image/png','image/jpeg','image/webp']);
 create policy read_task_files on storage.objects for select to authenticated using(bucket_id='task-files' and public.is_member());
 create policy upload_task_files on storage.objects for insert to authenticated with check(
