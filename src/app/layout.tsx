@@ -21,7 +21,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
-      <body>{children}</body>
+      {/* Bazı eklentiler (ColorZilla, Grammarly, LastPass) <body>'ye öznitelik ekler; hidrasyon uyarısı bundan çıkar. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
