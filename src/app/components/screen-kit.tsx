@@ -9,6 +9,20 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
+/** Tam sayfa yükleme ekranı: dijitaldesin.com'daki yükleyicinin aynısı (kayan çubuk + yanıp sönen yazı). */
+export function PageLoader({ label = 'Yükleniyor...' }: { label?: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-6" role="status" aria-live="polite" aria-busy="true">
+      <div className="animate-loader-in flex flex-col items-center gap-7">
+        <div className="h-1 w-48 overflow-hidden rounded-full bg-muted">
+          <div className="animate-loader-bar h-full w-1/3 rounded-full bg-intro-sky" />
+        </div>
+        <p className="animate-loader-text text-sm font-semibold tracking-wide text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 export type Props = {
   data: Data; person: Profile; demo: boolean; busy: boolean; notices: Notice[]; guides: Guide[];
   onUser: (p: Profile) => void; onLogout: () => void; onCreate: (c: Category) => void;
