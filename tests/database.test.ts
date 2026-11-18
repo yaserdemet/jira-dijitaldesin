@@ -167,5 +167,24 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   // Not: Realtime'ın RLS süzmesi Supabase sunucusunda olur, PGlite'ta test edilemez.
   // Uygulama yalnızca INSERT/UPDATE dinler; silme olaylarında Supabase RLS uygulamaz.
  });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/009_clear_audit_logs.sql',import.meta.url),'utf8'));
+ await t.test('denetim kayıtlarını yalnızca süper admin temizler ve temizleme iz bırakır',async()=>{
+  await db.exec('reset role');
+  const before=Number((await db.query<{n:string}>('select count(*) as n from public.audit_logs')).rows[0].n);
+  assert.ok(before>1,'temizlenecek kayıt var');
+  // Çalışan fonksiyonu çağıramaz, tabloyu doğrudan da silemez.
+  await login(2);
+  await assert.rejects(db.query('select public.clear_audit_logs()'),/Süper admin/);
+  await assert.rejects(db.exec('delete from public.audit_logs'));
+  // Süper admin de tabloyu doğrudan silemez; yalnızca fonksiyon izinli.
+  await login(0);
+  await assert.rejects(db.exec('delete from public.audit_logs'));
+  const removed=(await db.query<{clear_audit_logs:number}>('select public.clear_audit_logs()')).rows[0].clear_audit_logs;
+  assert.equal(removed,before);
+  await db.exec('reset role');
+  const rest=(await db.query<{actor_id:string;action:string;details:string}>('select actor_id,action,details from public.audit_logs')).rows;
+  assert.deepEqual(rest,[{actor_id:ids[0],action:'Denetim kayıtları silindi',details:`${before} kayıt kalıcı olarak silindi`}]);
+ });
  }finally{await db.close()}
 });

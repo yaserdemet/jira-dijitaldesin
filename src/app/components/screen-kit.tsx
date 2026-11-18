@@ -32,6 +32,7 @@ export type Props = {
   onFiles: (t: Task, files: File[], kind: Attachment['kind']) => Promise<boolean>;
   onDownload: (a: Attachment) => void; onRead: (ids: string[]) => Promise<boolean>;
   onGuide: (title: string, body: string) => Promise<boolean>;
+  onClearLogs: () => Promise<boolean>;
   onResponsibilities: (id: string, technical: boolean, design: boolean) => Promise<boolean>;
   onAddUser: () => void; onPassword: (p: Profile) => void; onActive: (p: Profile) => void; onDelete: (p: Profile) => void;
   error: string; toast: string;
