@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { IntegrationCanvas } from './integration-canvas';
 import { designSizes, requestForms } from './request-forms';
 import { priorityTone } from './screen-kit';
 
@@ -30,24 +31,6 @@ function FormError({ message, onClear }: { message: string; onClear?: () => void
   );
 }
 
-/** Baskı ajansının kayıt işareti: üst üste binen camgöbeği, macenta ve sarı. */
-function RegistrationMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 240 240" className={className} aria-hidden>
-      <g className="mix-blend-multiply dark:mix-blend-screen">
-        <circle cx="96" cy="100" r="62" fill="#00a3df" opacity="0.85" />
-        <circle cx="144" cy="100" r="62" fill="#e5007e" opacity="0.75" />
-        <circle cx="120" cy="142" r="62" fill="#ffe600" opacity="0.85" />
-      </g>
-      <g stroke="currentColor" strokeWidth="1.5" fill="none" className="text-foreground">
-        <circle cx="120" cy="120" r="104" />
-        <line x1="120" y1="4" x2="120" y2="236" />
-        <line x1="4" y1="120" x2="236" y2="120" />
-      </g>
-    </svg>
-  );
-}
-
 export function Login({ busy, configured, allowDemo, onDemo, error, run, session, onLogout }: {
   busy: boolean; configured: boolean; allowDemo: boolean; onDemo: () => void; error: string;
   run: (fn: () => Promise<void>) => Promise<boolean>; session: Session | null; onLogout: () => void;
@@ -55,14 +38,14 @@ export function Login({ busy, configured, allowDemo, onDemo, error, run, session
   const [email, setEmail] = useState(''), [password, setPassword] = useState('');
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden flex-col justify-between overflow-hidden border-r bg-background p-10 lg:flex">
-        <img src="/logo.svg" alt="dijitaldesin" className="h-16 w-auto self-start dark:invert" />
-        <RegistrationMark className="pointer-events-none absolute top-1/2 -right-24 size-[460px] -translate-y-1/2 opacity-90" />
-        <div className="relative max-w-md">
-          <h1 className="text-5xl leading-[1.02] font-semibold tracking-tight">Ajansın bütün talepleri tek panoda.</h1>
-          <p className="mt-5 max-w-[42ch] text-lg text-muted-foreground">Teknik destek, grafik tasarım ve ekip içi işler. Kim neyle uğraşıyor, hangi iş takıldı; hepsi aynı yerde.</p>
+      {/* Zemin dashboard-intro'daki entegrasyon panelinin lacivert rengi; her temada aynı kalır. */}
+      <section className="relative hidden flex-col gap-10 overflow-hidden bg-intro-panel p-10 lg:flex">
+        {/* Logo siyah; lacivert zeminde görünsün diye beyaza çevrilir. */}
+        <img src="/logo.svg" alt="dijitaldesin" className="h-16 w-auto self-start invert" />
+        <div className="flex flex-1 items-center">
+          <IntegrationCanvas />
         </div>
-        <p className="relative text-sm text-muted-foreground">Yalnızca yöneticinin açtığı hesaplar giriş yapabilir.</p>
+        <p className="text-sm text-intro-muted">Yalnızca yöneticinin açtığı hesaplar giriş yapabilir.</p>
       </section>
 
       <section className="flex items-center justify-center bg-card px-6 py-12">

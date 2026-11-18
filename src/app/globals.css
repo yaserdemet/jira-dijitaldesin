@@ -49,6 +49,22 @@
   --prio-urgent-bg: #fce4ee;
   --prio-urgent-ink: #a3254f;
   --prio-urgent-line: #f3bcd1;
+
+  /* Giriş ekranının sol tarafı: dashboard-intro'daki entegrasyon panelinin renkleri, birebir.
+     Her iki temada da aynı kalır, bu yüzden koyu temada ayrıca tanımlanmaz. */
+  --intro-night: #13111c;
+  --intro-panel: #191d2b;
+  --intro-surface: #1c1a26;
+  --intro-raised: #25222f;
+  --intro-line: #2e2b3a;
+  --intro-ink: #f4f3fa;
+  --intro-muted: #9b98a8;
+  --intro-link: #c4b5fd;
+  --intro-ok: #6ee7b7;
+  --intro-ok-dot: #34d399;
+  --intro-violet: #a78bfa;
+  --intro-pink: #f472b6;
+  --intro-sky: #38bdf8;
 }
 
 @theme inline {
@@ -79,6 +95,20 @@
   --color-state-doing: var(--state-doing);
   --color-state-done: var(--state-done);
   --color-state-problem: var(--state-problem);
+
+  --color-intro-night: var(--intro-night);
+  --color-intro-panel: var(--intro-panel);
+  --color-intro-surface: var(--intro-surface);
+  --color-intro-raised: var(--intro-raised);
+  --color-intro-line: var(--intro-line);
+  --color-intro-ink: var(--intro-ink);
+  --color-intro-muted: var(--intro-muted);
+  --color-intro-link: var(--intro-link);
+  --color-intro-ok: var(--intro-ok);
+  --color-intro-ok-dot: var(--intro-ok-dot);
+  --color-intro-violet: var(--intro-violet);
+  --color-intro-pink: var(--intro-pink);
+  --color-intro-sky: var(--intro-sky);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -231,6 +261,33 @@
 @keyframes comment-flash {
   from { background-color: var(--accent); box-shadow: 0 0 0 3px var(--accent); }
   to { background-color: transparent; box-shadow: 0 0 0 3px transparent; }
+}
+
+/* Giriş ekranındaki entegrasyon tuvali: düğümler yanlardan gelir, bağlantılar çizilir ve akar. */
+.canvas-node { animation: canvas-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.canvas-from-left { --canvas-x: -20px; }
+.canvas-from-right { --canvas-x: 20px; }
+.canvas-hub { animation: canvas-pop 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.canvas-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: canvas-draw 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.canvas-flow {
+  stroke-dasharray: 4 8;
+  animation: canvas-flow 1s linear infinite;
+}
+@keyframes canvas-in {
+  from { opacity: 0; transform: translateX(var(--canvas-x, 0)); filter: blur(6px); }
+}
+@keyframes canvas-pop {
+  from { opacity: 0; transform: scale(0.85); }
+}
+@keyframes canvas-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes canvas-flow {
+  to { stroke-dashoffset: -12; }
 }
 
 @media (prefers-reduced-motion: reduce) {
