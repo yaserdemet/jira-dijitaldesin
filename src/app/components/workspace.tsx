@@ -1,11 +1,11 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
 import { Attachment, Audit, Category, Data, Message, Profile, Task, TaskInput, assignableProfiles, canEdit, canManage, categories, taskSchema, validateFile } from '@/lib/domain';
 import { supabase, demoAllowed } from '@/lib/client';
 import { getDemoFile, putDemoFile, readDemo, saveDemo } from '@/lib/demo';
 import { AddUserDialog, CreateDialog, Login, PasswordDialog, maxRequestFiles } from './forms';
 import WorkflowScreen from './workflow-screen';
+import { PageLoader } from './screen-kit';
 import {Guide,Notice,canRequestRevision,taskProgress,workflowState} from '@/lib/workflow';
 import type { Session } from '@supabase/supabase-js';
 const empty:Data={profiles:[],tasks:[],messages:[],attachments:[],logs:[],events:[]};
@@ -20,6 +20,8 @@ export default function Workspace(){
  const [creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[toast,setToast]=useState(''),[addingUser,setAddingUser]=useState(false),[pwTarget,setPwTarget]=useState<Profile|null>(null);
  const demoData=useRef<Data>(empty);
  const sessionUser=useRef<string|null>(null);
+ // Yalnızca gerçek girişten sonra bir kez "Hoş geldin" denir; sayfa yenilemede (INITIAL_SESSION) denmez.
+ const welcomePending=useRef(false);
  const [notices,setNotices]=useState<Notice[]>([]),[guides,setGuides]=useState<Guide[]>([]);
  const [createCategory,setCreateCategory]=useState<Category>('Teknik İşlemler');
  useEffect(()=>{const sync=()=>{
@@ -38,6 +40,7 @@ export default function Workspace(){
   if(sessionUser.current!==session.user.id)return;
   if(error||!p?.active){setPerson(null);setData(empty);throw new Error('Hesabınızın erişimi yok. Yöneticinizle görüşün.')}
   setPerson(p);
+  if(welcomePending.current){welcomePending.current=false;notify(`Hoş geldin, ${p.name.split(' ')[0]}!`)}
   const names=['profiles','tasks','messages','attachments','task_events',...(p.role==='super_admin'?['audit_logs']:[])];
   const results=await Promise.all(names.map(async n=>{
    const rows:unknown[]=[];for(let offset=0;;offset+=500){
@@ -56,9 +59,10 @@ export default function Workspace(){
  },[demo,session]);
  useEffect(()=>{
   if(!supabase){setReady(true);return;}
-  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((event,next)=>{
    const id=next?.user.id??null;
    if(sessionUser.current!==id){
+    welcomePending.current=event==='SIGNED_IN'&&id!==null;
     sessionUser.current=id;
     setPerson(null);setData(empty);setNotices([]);setGuides([]);setAddingUser(false);setPwTarget(null);
    }
@@ -143,7 +147,8 @@ export default function Workspace(){
    notify('Bölüm sorumluları güncellendi.');
   }else if(body.action==='delete'){if(body.id===person.id)throw new Error('Kendi hesabınızı silemezsiniz.');const target=demoData.current.profiles.find(p=>p.id===body.id);if(!target||target.role==='super_admin')throw new Error('Süper admin hesabı bu ekrandan silinemez.');const now=new Date().toISOString();commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,name:'Silinmiş kullanıcı',email:'',team:'',active:false,technical_assignee:false,design_assignee:false,deleted_at:now}:p),tasks:demoData.current.tasks.map(t=>t.assignee_id===body.id&&!['Tamamlandı','İptal'].includes(t.status)?{...t,assignee_id:null}:t),logs:[log('Kullanıcı kalıcı olarak silindi',String(body.id),target.name),...demoData.current.logs]});notify('Kullanıcı kalıcı olarak silindi.')}else if(body.action==='password'){notify('Deneme modunda şifre kaydedilmez.')}else if(body.action==='create'){const p:Profile={id:uid(),name:String(body.name),email:String(body.email),team:String(body.team),role:'employee',active:true};if(data.profiles.some(x=>x.email.toLowerCase()===p.email.toLowerCase()))throw new Error('Bu e-posta zaten kayıtlı.');commit({...demoData.current,profiles:[...demoData.current.profiles,p],logs:[log('Deneme kullanıcısı eklendi',p.id,p.email),...demoData.current.logs]});notify('Deneme kullanıcısı eklendi; e-posta gönderilmedi.')}else{if(body.id===person.id)throw new Error('Kendi hesabınızı kapatamazsınız.');commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,active:Boolean(body.active)}:p),logs:[log(body.active?'Hesap etkinleştirildi':'Hesap erişimi kapatıldı',String(body.id)),...demoData.current.logs]});notify('Kullanıcı güncellendi.')}}else{const {data:{session:s}}=await supabase!.auth.getSession();const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${s?.access_token}`},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw new Error(result.error);notify(body.action==='create'?'Kullanıcı oluşturuldu. E-posta ve şifresiyle giriş yapabilir.':body.action==='password'?'Şifre güncellendi.':body.action==='delete'?'Kullanıcı kalıcı olarak silindi.':'Kullanıcı güncellendi.');await load()}setAddingUser(false);setPwTarget(null)}
  async function changePassword(target:Profile,password:string){if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');if(!demo&&target.id===person?.id){const {error}=await supabase!.auth.updateUser({password});if(error)throw error;notify('Şifren güncellendi.');setPwTarget(null);return}await adminAction({action:'password',id:target.id,password})}
- if(!ready)return <div className="flex min-h-screen items-center justify-center gap-2 text-sm text-muted-foreground"><LoaderCircle className="size-4 animate-spin"/> Çalışma alanı açılıyor</div>;
+ // Oturum var ama profil henüz gelmediyse giriş ekranı değil yükleyici gösterilir; aksi hâlde yenilemede giriş ekranı kısa süre görünür.
+ if(!ready||(session&&!person&&!error))return <PageLoader />;
  if(!person)return <Login busy={busy} configured={!!supabase} allowDemo={demoAllowed} onDemo={startDemo} error={error} run={run} session={session} onLogout={()=>run(async()=>{await supabase?.auth.signOut();setSession(null);setError('')})}/>;
  const clearError=()=>setError('');
  return <>
