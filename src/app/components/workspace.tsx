@@ -20,6 +20,8 @@ export default function Workspace(){
  const [creating,setCreating]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[toast,setToast]=useState(''),[addingUser,setAddingUser]=useState(false),[pwTarget,setPwTarget]=useState<Profile|null>(null);
  const demoData=useRef<Data>(empty);
  const sessionUser=useRef<string|null>(null);
+ // Yalnızca gerçek girişten sonra bir kez "Hoş geldin" denir; sayfa yenilemede (INITIAL_SESSION) denmez.
+ const welcomePending=useRef(false);
  const [notices,setNotices]=useState<Notice[]>([]),[guides,setGuides]=useState<Guide[]>([]);
  const [createCategory,setCreateCategory]=useState<Category>('Teknik İşlemler');
  useEffect(()=>{const sync=()=>{
@@ -38,6 +40,7 @@ export default function Workspace(){
   if(sessionUser.current!==session.user.id)return;
   if(error||!p?.active){setPerson(null);setData(empty);throw new Error('Hesabınızın erişimi yok. Yöneticinizle görüşün.')}
   setPerson(p);
+  if(welcomePending.current){welcomePending.current=false;notify(`Hoş geldin, ${p.name.split(' ')[0]}!`)}
   const names=['profiles','tasks','messages','attachments','task_events',...(p.role==='super_admin'?['audit_logs']:[])];
   const results=await Promise.all(names.map(async n=>{
    const rows:unknown[]=[];for(let offset=0;;offset+=500){
@@ -56,9 +59,10 @@ export default function Workspace(){
  },[demo,session]);
  useEffect(()=>{
   if(!supabase){setReady(true);return;}
-  const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{
+  const {data:{subscription}}=supabase.auth.onAuthStateChange((event,next)=>{
    const id=next?.user.id??null;
    if(sessionUser.current!==id){
+    welcomePending.current=event==='SIGNED_IN'&&id!==null;
     sessionUser.current=id;
     setPerson(null);setData(empty);setNotices([]);setGuides([]);setAddingUser(false);setPwTarget(null);
    }

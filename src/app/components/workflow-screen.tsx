@@ -52,6 +52,8 @@ export default function WorkflowScreen(p: Props) {
   const taskPath = (t: Task) => '/talep/' + t.id;
   const notices = p.notices.filter(n => n.recipient_id === p.person.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const unread = notices.filter(n => !n.read_at);
+  // Profil rozetindeki sayı: bana atanmış, arşivde olmayan ve henüz başlanmamış (Bekliyor) işler.
+  const waiting = p.data.tasks.filter(t => t.assignee_id === p.person.id && !t.archived_at && workflowState(t) === 'Bekliyor').length;
   async function openNotice(n: Notice) { if (await p.onRead([n.id])) { go('/talep/' + n.task_id + (n.message_id ? '?yorum=' + n.message_id : '')); if (n.message_id) setTimeout(() => document.getElementById('yorum-' + n.message_id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); } }
   const category = paths[route.split('/')[2]];
   const selected = p.data.tasks.find(t => route === '/talep/' + t.id);
@@ -134,7 +136,19 @@ export default function WorkflowScreen(p: Props) {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type="button" className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50" aria-label="Hesap menüsü"><Avatar name={p.person.name} src={avatarSrc} /></button>
+                <button
+                  type="button"
+                  className="relative rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  aria-label={waiting ? `Hesap menüsü, seni bekleyen ${waiting} iş var` : 'Hesap menüsü'}
+                  title={waiting ? `Seni bekleyen ${waiting} iş var` : undefined}
+                >
+                  <Avatar name={p.person.name} src={avatarSrc} />
+                  {waiting > 0 && (
+                    <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-4 font-semibold text-primary-foreground ring-2 ring-background">
+                      {waiting}
+                    </span>
+                  )}
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
@@ -340,7 +354,7 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
     <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0">
         <section className="pt-4 pb-10">
-          <p className="text-muted-foreground">Merhaba {firstName}.</p>
+          <p className="text-muted-foreground">Hoş geldin, {firstName}.</p>
           <h1 className="mt-2 max-w-[18ch] text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl">{sentence}</h1>
           <div className="mt-6 flex flex-wrap gap-2">
             <Button size="lg" onClick={() => p.onCreate('Teknik İşlemler')}><Plus /> Yeni talep</Button>
