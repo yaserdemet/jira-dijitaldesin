@@ -1,6 +1,6 @@
 'use client';
 // Giriş ekranı ve formlar. Doğrulama ve gönderim mantığı önceki sürümle aynıdır; yalnızca görünüm değişti.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { Copy, FileText, KeyRound, LoaderCircle, Paperclip, Plus, RefreshCw, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { type Category, type Profile, type TaskInput, assignableProfiles, categories, priorities, taskSchema, validateFile } from '@/lib/domain';
@@ -111,6 +111,8 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
   const [files, setFiles] = useState<File[]>([]);
   const [localError, setLocalError] = useState('');
   const [requestTypes, setRequestTypes] = useState<string[]>([]);
+  // Yüksek/Acil seçilince kısa bir "gerçekten mi?" hatırlatması; id her seçimde zamanlayıcıyı yeniden başlatır.
+  const [nudge, setNudge] = useState<{ id: number; priority: TaskInput['priority'] } | null>(null);
   const [sizes, setSizes] = useState<string[]>([]);
   const [customSize, setCustomSize] = useState('');
   const design = category === 'Grafik İşlemleri';
@@ -141,6 +143,22 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
   }
 
   const toggle = (list: string[], value: string, on: boolean) => on ? [...list, value] : list.filter(v => v !== value);
+
+  // Hatırlatma 3 saniye sonra kendiliğinden kaybolur.
+  useEffect(() => {
+    if (!nudge) return;
+    const timer = setTimeout(() => setNudge(null), 3000);
+    return () => clearTimeout(timer);
+  }, [nudge]);
+
+  function choosePriority(priority: TaskInput['priority']) {
+    if (priority !== input.priority && priority !== 'Normal') {
+      setNudge({ id: Date.now(), priority });
+    } else if (priority === 'Normal') {
+      setNudge(null);
+    }
+    setInput({ ...input, priority });
+  }
 
   return (
     <Dialog open onOpenChange={o => { if (!o && !busy) onClose(); }}>
@@ -242,11 +260,25 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
             </div>
 
             <fieldset>
-              <legend className="mb-2 text-sm font-medium">Öncelik</legend>
+              <legend className="mb-2 flex min-h-6 items-center gap-2 text-sm font-medium">
+                Öncelik
+                {nudge && (
+                  <span
+                    key={nudge.id}
+                    role="status"
+                    className={cn(
+                      'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold animate-in fade-in zoom-in-95',
+                      priorityTone(nudge.priority),
+                    )}
+                  >
+                    {nudge.priority === 'Acil' ? 'Gerçekten acil mi?' : 'Gerçekten yüksek öncelikli mi?'}
+                  </span>
+                )}
+              </legend>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Öncelik">
                 {priorities.map(s => (
                   <button
-                    key={s} type="button" role="radio" aria-checked={input.priority === s} onClick={() => setInput({ ...input, priority: s })}
+                    key={s} type="button" role="radio" aria-checked={input.priority === s} onClick={() => choosePriority(s)}
                     className={cn(
                       'rounded-lg border-[1.5px] px-3 py-2 text-sm font-semibold transition-[opacity,box-shadow] focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
                       priorityTone(s),
