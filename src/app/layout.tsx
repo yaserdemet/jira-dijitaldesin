@@ -8,7 +8,7 @@ const display = Bricolage_Grotesque({ subsets: ['latin', 'latin-ext'], variable:
 const ui = Instrument_Sans({ subsets: ['latin', 'latin-ext'], variable: '--font-brand-ui' });
 
 export const metadata: Metadata = {
-  title: 'Akış · dijitaldesin',
+  title: 'Dijitaldesin | Jira',
   description: 'Ajansın talepleri tek panoda.',
   robots: { index: false, follow: false },
 };
