@@ -186,5 +186,65 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   const rest=(await db.query<{actor_id:string;action:string;details:string}>('select actor_id,action,details from public.audit_logs')).rows;
   assert.deepEqual(rest,[{actor_id:ids[0],action:'Denetim kayıtları silindi',details:`${before} kayıt kalıcı olarak silindi`}]);
  });
+ await db.exec('reset role');
+ await db.exec(await readFile(new URL('../supabase/migrations/010_delete_task.sql',import.meta.url),'utf8'));
+ await t.test('talebi yalnızca açan kişi veya süper admin kalıcı siler; bağlı kayıtlar da silinir',async()=>{
+  // İkinci aktif çalışan: talebi açmamış biri silememeli.
+  const other='55555555-5555-4555-8555-555555555555';
+  await db.exec('reset role');
+  await db.query(`insert into auth.users(id,email,raw_user_meta_data) values($1,'other@example.test','{"name":"Başka Çalışan"}')`,[other]);
+  await db.query('update public.profiles set active=true where id=$1',[other]);
+  // Çalışan 2 önceki bir testte pasif yapıldı; talep açabilmesi için yeniden etkinleştir.
+  await db.query('update public.profiles set active=true where id=$1',[ids[2]]);
+  ids.push(other);
+  const otherIndex=ids.length-1;
+  const createAs=async(i:number)=>{
+   await login(i);
+   return (await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,assignee_id,status) values('Silinecek iş','Örnek açıklama','Diğer Talepler','İç Ekip',$1,$2,'Atandı') returning id`,[ids[i],ids[0]])).rows[0].id;
+  };
+  const counts=async(id:string)=>{
+   await db.exec('reset role');
+   const n=async(sql:string)=>Number((await db.query<{n:string}>(sql,[id])).rows[0].n);
+   return {
+    tasks:await n('select count(*) as n from public.tasks where id=$1'),
+    messages:await n('select count(*) as n from public.messages where task_id=$1'),
+    attachments:await n('select count(*) as n from public.attachments where task_id=$1'),
+    events:await n('select count(*) as n from public.task_events where task_id=$1'),
+    notifications:await n('select count(*) as n from public.notifications where task_id=$1'),
+   };
+  };
+
+  // Çalışan 2 talep açar; yorum, bildirim, geçmiş ve dosya kaydı oluşur.
+  const own=await createAs(2);
+  const path=`${ids[2]}/${own}/brief.png`;
+  await db.query('insert into storage.objects(bucket_id,name) values($1,$2)',['task-files',path]);
+  await db.query(`insert into public.attachments(task_id,uploader_id,name,size,mime,path,kind) values($1,$2,'brief.png',68,'image/png',$3,'brief')`,[own,ids[2],path]);
+  await login(0);
+  await db.query(`insert into public.messages(task_id,author_id,body,recipient_id) values($1,$2,'Bakar mısın?',$3)`,[own,ids[0],ids[2]]);
+  const before=await counts(own);
+  assert.ok(before.messages&&before.attachments&&before.events&&before.notifications,'bağlı kayıtlar var');
+
+  // Talebi açmamış çalışan silemez; tabloyu doğrudan da silemez.
+  await login(otherIndex);
+  await assert.rejects(db.query('select public.delete_task($1)',[own]),/açan kişi veya süper admin/);
+  await assert.rejects(db.query('delete from public.tasks where id=$1',[own]));
+  assert.equal((await counts(own)).tasks,1,'talep yerinde');
+
+  // Açan kişi siler; dosya yolu sunucunun depodan silmesi için döner.
+  await login(2);
+  const paths=(await db.query<{delete_task:string[]}>('select public.delete_task($1)',[own])).rows[0].delete_task;
+  assert.deepEqual(paths,[path]);
+  assert.deepEqual(await counts(own),{tasks:0,messages:0,attachments:0,events:0,notifications:0});
+  await db.exec('reset role');
+  assert.equal((await db.query("select 1 from public.audit_logs where action='Talep kalıcı olarak silindi' and entity_id=$1 and actor_id=$2",[own,ids[2]])).rows.length,1,'iz kalır');
+
+  // Süper admin başkasının talebini silebilir.
+  const someone=await createAs(otherIndex);
+  await login(0);
+  assert.deepEqual((await db.query<{delete_task:string[]}>('select public.delete_task($1)',[someone])).rows[0].delete_task,[]);
+  assert.equal((await counts(someone)).tasks,0);
+  await login(0);
+  await assert.rejects(db.query('select public.delete_task($1)',[someone]),/bulunamadı/);
+ });
  }finally{await db.close()}
 });

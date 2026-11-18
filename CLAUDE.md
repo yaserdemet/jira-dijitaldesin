@@ -17,7 +17,7 @@ npm run build
 npm run temizle -- --deneme   # tamamlanmış işleri silme raporu (silmez)
 ```
 
-`npm run temizle` canlı veritabanından tamamlanmış BÜTÜN işleri ve bağlı kayıtlarını kalıcı siler ("SIL" onayı ister). Kullanıcı açıkça istemedikçe yalnızca `--deneme` ile çalıştır. Yeni bir tablo `tasks`'a bağlanırsa `scripts/temizle.ts` silme sırasına ve ilgili teste ekle.
+`npm run temizle` canlı veritabanından tamamlanmış BÜTÜN işleri ve bağlı kayıtlarını kalıcı siler ("SIL" onayı ister). Kullanıcı açıkça istemedikçe yalnızca `--deneme` ile çalıştır. Yeni bir tablo `tasks`'a bağlanırsa `scripts/temizle.ts` silme sırasına, `delete_task` fonksiyonuna (010) ve ilgili testlere ekle.
 
 Bir işi bitmiş saymadan önce `typecheck`, `test` ve `build` geçmeli. Arayüz değişikliğini tarayıcıda gözle kontrol et.
 Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kaldırma (kaldırılınca derleme "Jest worker ... child process exceptions" ile çöker).
@@ -29,14 +29,17 @@ Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kal
 - `src/app/components/request-forms.ts` — bölümlere göre talep formu alanları.
 - `src/lib/domain.ts` — tipler, zod şemaları, yetki yardımcıları (`canEdit`, `canManage`, `assignableProfiles`).
 - `src/lib/workflow.ts` — 4 durumlu akış (`Bekliyor`, `Yapılıyor`, `Tamamlandı`, `Sorun Var`) ile veritabanı durumları arasındaki eşleme.
-- `src/app/api/admin/users/route.ts` — service role anahtarıyla çalışan tek sunucu ucu (kullanıcı ekleme, şifre, erişim, bölüm sorumluları).
+- `src/app/api/admin/users/route.ts` — service role anahtarıyla çalışan sunucu ucu (kullanıcı ekleme, şifre, erişim, bölüm sorumluları).
+- `src/app/api/tasks/delete/route.ts` — talebi kalıcı silme: yetkiyi kullanıcının oturumuyla veritabanı denetler (`delete_task`), dosyaları depodan service role siler.
 - `supabase/migrations/NNN_*.sql` — şema ve iş kuralları. `tests/database.test.ts` bunları sırayla uygular.
 
 ## İş kuralları (değiştirmeden önce sor)
 
 - Onay adımı yok: sorumlu işi doğrudan Tamamlandı yapabilir.
 - Revize yalnızca talep sahibi/süper admin tarafından, Yapılıyor veya Tamamlandı işe istenir.
-- İptali yalnızca talebi açan veya süper admin yapar; iptal edilen iş arşive gider. Uygulamadan iş silinmez, yalnızca arşivlenir (toplu silme `npm run temizle`).
+- İptali yalnızca talebi açan veya süper admin yapar; iptal edilen iş arşive gider.
+- Kalıcı silme (`delete_task`, 010): yalnızca talebi açan veya süper admin, pano kartındaki onaylı "Sil" düğmesiyle. Yorumlar, geçmiş, bildirimler ve dosyalar da silinir; denetim kaydı kalır. Toplu silme `npm run temizle`.
+- Denetim kayıtlarını yalnızca süper admin silebilir (`clear_audit_logs`, 009); silme işlemi tek bir kayıtla iz bırakır.
 - Çalışan kalıcı silme (`delete_employee`, 007): giriş hesabı ve kişisel bilgiler silinir, profil satırı "Silinmiş kullanıcı" olarak kalır ki geçmiş bozulmasın; açık işlerden sorumluluk düşer. Süper admin ve kişinin kendisi silinemez. Silinenler (`deleted_at`) ekip listesinde görünmez.
 - Bölümde işaretli sorumlu yoksa herkes atanabilir; varsa yalnızca işaretli sorumlular.
 - Teslim tarihi yok (bilinçli olarak kaldırıldı).
@@ -90,4 +93,4 @@ Makinede RAM az: `next.config.ts` içindeki `experimental.cpus: 1` ayarını kal
 
 ## Tasarım
 
-Arayüz değişikliklerinde `.claude/skills/frontend-design` skill'ini kullan; ama ürünün hedefi **sade ve anlaşılır** olmak. Yeni kavram, alan veya buton eklemeden önce gerçekten gerekli mi diye sor; kartlar yalnızca başlık, marka, öncelik, sorumlu ve yorum sayısını gösterir.
+Arayüz değişikliklerinde `.claude/skills/frontend-design` skill'ini kullan; ama ürünün hedefi **sade ve anlaşılır** olmak. Yeni kavram, alan veya buton eklemeden önce gerçekten gerekli mi diye sor; kartlar yalnızca başlık, marka, öncelik, sorumlu ve yorum sayısını gösterir (talebi açana ve süper admin'e ayrıca "Sil" düğmesi).

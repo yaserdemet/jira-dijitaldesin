@@ -117,6 +117,9 @@ export default function Workspace(){
    channel.on('postgres_changes',{event:'INSERT',schema:'public',table},schedule);
    channel.on('postgres_changes',{event:'UPDATE',schema:'public',table},schedule);
   }
+  // Silinen talep diğer ekranlardan da hemen kalksın. Olayda yalnızca talebin kimliği gelir;
+  // talepleri zaten bütün üyeler görebildiği için bu bir şey açığa çıkarmaz.
+  channel.on('postgres_changes',{event:'DELETE',schema:'public',table:'tasks'},schedule);
   channel.subscribe(status=>{
    live=status==='SUBSCRIBED';
    // İlk bağlantıda ve kopup yeniden bağlanınca, abonelik kurulana kadar kaçan değişiklikler için bir kez yenile.
@@ -210,6 +213,33 @@ export default function Workspace(){
  }
  async function markRead(ids:string[]){const now=new Date().toISOString();if(demo){const next=notices.map(n=>ids.includes(n.id)&&n.recipient_id===person!.id?{...n,read_at:now}:n);setNotices(next);localStorage.setItem('akis-demo-notices',JSON.stringify(next))}else{const {error}=await supabase!.from('notifications').update({read_at:now}).in('id',ids).eq('recipient_id',person!.id);if(error)throw error;await load()}}
  // Denetim kayıtlarını kalıcı siler; veritabanı yalnızca süper admin'e izin verir ve silme işlemini tek kayıtla iz olarak bırakır.
+ // Talebi kalıcı siler (yorumlar, geçmiş, bildirimler ve dosyalarıyla). Yalnızca açan kişi veya süper admin;
+ // asıl kontrol veritabanında (010_delete_task.sql), dosyalar sunucu ucunda depodan silinir.
+ async function deleteTask(t:Task){
+  if(!person||!canManage(t,person))throw new Error('Talebi yalnızca açan kişi veya süper admin silebilir.');
+  if(demo){
+   const d=demoData.current;
+   const files=d.attachments.filter(a=>a.task_id===t.id).length;
+   commit({
+    ...d,
+    tasks:d.tasks.filter(x=>x.id!==t.id),
+    messages:d.messages.filter(m=>m.task_id!==t.id),
+    attachments:d.attachments.filter(a=>a.task_id!==t.id),
+    events:d.events.filter(e=>e.task_id!==t.id),
+    logs:[log('Talep kalıcı olarak silindi',t.id,'#'+t.number+' '+t.title+' ('+files+' dosya)'),...d.logs],
+   });
+   setNotices(old=>old.filter(n=>n.task_id!==t.id));
+   notify('Talep kalıcı olarak silindi.');
+   return;
+  }
+  const {data:{session:s}}=await supabase!.auth.getSession();
+  const r=await fetch('/api/tasks/delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${s?.access_token}`},body:JSON.stringify({id:t.id})});
+  const result=await r.json().catch(()=>({error:'Talep silinemedi. Yeniden deneyin.'}));
+  if(!r.ok)throw new Error(result.error??'Talep silinemedi. Yeniden deneyin.');
+  if(location.pathname==='/talep/'+t.id)navigate('/');
+  await load();
+  notify(result.fileError?'Talep silindi, ancak bazı dosyalar depodan silinemedi.':'Talep kalıcı olarak silindi.');
+ }
  async function clearLogs(){
   if(person?.role!=='super_admin')throw new Error('Denetim kayıtlarını yalnızca süper admin silebilir.');
   if(demo){
@@ -241,7 +271,7 @@ export default function Workspace(){
  if(!person)return <Login busy={busy} configured={!!supabase} allowDemo={demoAllowed} onDemo={startDemo} error={error} run={run} session={session} onLogout={()=>run(async()=>{await supabase?.auth.signOut();setSession(null);setError('')})}/>;
  const clearError=()=>setError('');
  return <>
-  <WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={creating||addingUser||pwTarget?'':error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>navigate('/yeni?kategori='+encodeURIComponent(c))} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onArchive={ts=>run(()=>archiveTasks(ts))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onClearLogs={()=>run(clearLogs)} onResponsibilities={(id,technical,design)=>run(()=>adminAction({action:"responsibilities",id,technical,design}))} onAddUser={()=>setAddingUser(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))} onDelete={p=>run(()=>adminAction({action:'delete',id:p.id}))}/>
+  <WorkflowScreen data={data} person={person} demo={demo} busy={busy} notices={notices} guides={guides} error={creating||addingUser||pwTarget?'':error} toast={toast} onUser={p=>{setPerson(p);navigate('/')}} onLogout={()=>run(async()=>{if(!demo)await supabase!.auth.signOut();setDemo(false);setPerson(null);setData(empty)})} onCreate={c=>navigate('/yeni?kategori='+encodeURIComponent(c))} onUpdate={(t,patch,note)=>run(()=>updateTask(t,patch,note))} onArchive={ts=>run(()=>archiveTasks(ts))} onMessage={(t,body,recipient,parent,kind)=>run(()=>addMessage(t,body,kind,recipient,parent))} onFiles={(t,files,kind)=>run(async()=>{files.forEach(validateFile);for(const f of files)await upload(t.id,f,kind);await load();notify('Dosyalar eklendi.')})} onDownload={a=>run(()=>openFile(a))} onRead={ids=>run(()=>markRead(ids))} onGuide={(title,body)=>run(()=>addGuide(title,body))} onClearLogs={()=>run(clearLogs)} onDeleteTask={t=>run(()=>deleteTask(t))} onResponsibilities={(id,technical,design)=>run(()=>adminAction({action:"responsibilities",id,technical,design}))} onAddUser={()=>setAddingUser(true)} onPassword={setPwTarget} onActive={p=>run(()=>adminAction({action:'active',id:p.id,active:!p.active}))} onDelete={p=>run(()=>adminAction({action:'delete',id:p.id}))}/>
   {creating&&<CreateDialog key={createCategory} profiles={data.profiles} category={createCategory} onCategory={c=>{history.replaceState(null,'','/yeni?kategori='+encodeURIComponent(c));setCreateCategory(c)}} busy={busy} error={error} onClearError={clearError} onClose={()=>{setCreating(false);navigate('/')}} onSubmit={(input,files)=>run(()=>createTask(input,files))}/>}
   {addingUser&&<AddUserDialog busy={busy} demo={demo} error={error} onClearError={clearError} onClose={()=>setAddingUser(false)} onSubmit={b=>run(()=>adminAction(b))}/>}
   {pwTarget&&<PasswordDialog busy={busy} target={pwTarget} self={pwTarget.id===person.id} error={error} onClearError={clearError} onClose={()=>setPwTarget(null)} onSubmit={pw=>run(()=>changePassword(pwTarget,pw))}/>}
