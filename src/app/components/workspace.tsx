@@ -9,6 +9,8 @@ import { PageLoader } from './screen-kit';
 import {Guide,Notice,canRequestRevision,taskProgress,workflowState} from '@/lib/workflow';
 import type { Session } from '@supabase/supabase-js';
 const empty:Data={profiles:[],tasks:[],messages:[],attachments:[],logs:[],events:[]};
+// 008_realtime.sql ile Realtime'a açılan tablolar; biri değişince ekran yenilenir.
+const realtimeTables=['profiles','tasks','messages','attachments','task_events','notifications','guides'] as const;
 function visibleGuides(guides:Guide[]){
  return guides.filter(guide=>!['guide-request','guide-delivery'].includes(guide.id)
   && !['iyi bir talep nasıl açılır','dosya teslimi ve revize'].includes(guide.title.trim().replace(/[?.!]+$/,'').toLocaleLowerCase('tr-TR')));
@@ -22,6 +24,8 @@ export default function Workspace(){
  const sessionUser=useRef<string|null>(null);
  // Yalnızca gerçek girişten sonra bir kez "Hoş geldin" denir; sayfa yenilemede (INITIAL_SESSION) denmez.
  const welcomePending=useRef(false);
+ // Üst üste başlayan yüklemelerde yalnızca en yenisinin sonucu yazılır; yavaş kalan eski yükleme yeni veriyi ezmez.
+ const loadSeq=useRef(0);
  const [notices,setNotices]=useState<Notice[]>([]),[guides,setGuides]=useState<Guide[]>([]);
  const [createCategory,setCreateCategory]=useState<Category>('Teknik İşlemler');
  useEffect(()=>{const sync=()=>{
@@ -36,8 +40,10 @@ export default function Workspace(){
  const load=useCallback(async()=>{
   if(demo){setData({...demoData.current});return}
   if(!supabase||!session)return;
+  const seq=++loadSeq.current;
+  const outdated=()=>sessionUser.current!==session.user.id||seq!==loadSeq.current;
   const {data:p,error}=await supabase.from('profiles').select('*').eq('id',session.user.id).single();
-  if(sessionUser.current!==session.user.id)return;
+  if(outdated())return;
   if(error||!p?.active){setPerson(null);setData(empty);throw new Error('Hesabınızın erişimi yok. Yöneticinizle görüşün.')}
   setPerson(p);
   if(welcomePending.current){welcomePending.current=false;notify(`Hoş geldin, ${p.name.split(' ')[0]}!`)}
@@ -49,12 +55,11 @@ export default function Workspace(){
    }return {data:rows};
   }));
   const next={profiles:results[0].data,tasks:results[1].data,messages:results[2].data,attachments:results[3].data,events:results[4]?.data??[],logs:results[5]?.data??[]} as Data;
-  
-  if(sessionUser.current!==session.user.id)return;
+  if(outdated())return;
   setData(next);
   const extra=await Promise.all([supabase.from('notifications').select('*').order('created_at',{ascending:false}).limit(500),supabase.from('guides').select('*').order('created_at',{ascending:false})]);
   for(const result of extra)if(result.error)throw new Error('Ekran güncellemesi için 003_workflow.sql veritabanı geçişini uygulayın. '+result.error.message);
-  if(sessionUser.current!==session.user.id)return;
+  if(outdated())return;
   setNotices(extra[0].data as Notice[]);setGuides(visibleGuides(extra[1].data as Guide[]));
  },[demo,session]);
  useEffect(()=>{
@@ -71,7 +76,77 @@ export default function Workspace(){
   return()=>subscription.unsubscribe();
  },[]);
  useEffect(()=>{if(session||demo)load().catch(fail)},[session,demo,load]);
- useEffect(()=>{if(!session||demo)return;const id=setInterval(()=>load().catch(fail),30000);return()=>clearInterval(id)},[load,session,demo]);
+ // Anlık güncelleme: Realtime yalnızca "bir şey değişti" sinyali verir, veri yine load() ile RLS'li okunur.
+ // Sekme arka plandayken yenilenmez; geri dönülünce kaçan değişiklik varsa bir kez yenilenir.
+ useEffect(()=>{
+  const db=supabase;
+  if(!db||!session||demo)return;
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  let firstEventAt=0;
+  let stale=false;
+  let live=false;
+  let lastLoad=Date.now();
+
+  const refresh=()=>{
+   timer=undefined;
+   firstEventAt=0;
+   if(document.visibilityState!=='visible'){
+    stale=true;
+    return;
+   }
+   stale=false;
+   lastLoad=Date.now();
+   load().catch(fail);
+  };
+
+  // Art arda gelen değişiklikler (iş + olay kaydı + bildirim) tek yenilemede toplanır,
+  // ama sürekli akan değişiklikler yenilemeyi 2 saniyeden fazla geciktiremez.
+  const schedule=()=>{
+   const now=Date.now();
+   if(!firstEventAt)firstEventAt=now;
+   clearTimeout(timer);
+   timer=setTimeout(refresh,Math.max(0,Math.min(500,firstEventAt+2000-now)));
+  };
+
+  // Kanal adı her çalıştırmada benzersiz: kapanmakta olan eski kanal yeniden kullanılırsa
+  // abonelik sessizce düşer (supabase-js aynı adlı kanalı geri verir).
+  const channel=db.channel('akis-degisiklikler-'+uid());
+  for(const table of realtimeTables){
+   // DELETE dinlenmez: Supabase silme olaylarında RLS uygulamaz. Uygulama zaten silmez,
+   // arşivler; toplu silmeler (npm run temizle) yedek yenilemeyle yakalanır.
+   channel.on('postgres_changes',{event:'INSERT',schema:'public',table},schedule);
+   channel.on('postgres_changes',{event:'UPDATE',schema:'public',table},schedule);
+  }
+  channel.subscribe(status=>{
+   live=status==='SUBSCRIBED';
+   // İlk bağlantıda ve kopup yeniden bağlanınca, abonelik kurulana kadar kaçan değişiklikler için bir kez yenile.
+   if(live)schedule();
+  });
+
+  const onVisible=()=>{
+   if(document.visibilityState==='visible'&&stale)refresh();
+  };
+  document.addEventListener('visibilitychange',onVisible);
+
+  // Yedek: Realtime bağlı değilse eskisi gibi 30 saniyede bir, bağlıysa 5 dakikada bir yenile.
+  const fallback=setInterval(()=>{
+   const due=live?300000:30000;
+   if(Date.now()-lastLoad<due)return;
+   if(document.visibilityState!=='visible'){
+    stale=true;
+    return;
+   }
+   lastLoad=Date.now();
+   load().catch(fail);
+  },30000);
+
+  return()=>{
+   clearTimeout(timer);
+   clearInterval(fallback);
+   document.removeEventListener('visibilitychange',onVisible);
+   void db.removeChannel(channel);
+  };
+ },[load,session,demo]);
  const run=async(fn:()=>Promise<void>)=>{if(busy)return false;setBusy(true);setError('');try{await fn();return true}catch(e){fail(e);return false}finally{setBusy(false)}};
  function commit(next:Data){saveDemo(next);demoData.current=next;setData(next)}
  function log(action:string,entity_id:string,details=''):Audit{return{id:uid(),actor_id:person!.id,action,entity_id,details,created_at:new Date().toISOString()}}
