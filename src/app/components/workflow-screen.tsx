@@ -16,16 +16,19 @@ import { Board, StateRail, TaskList } from './board';
 import { Avatar, ConfirmAction, EmptyState, Panel, type Props, formatDate, paths } from './screen-kit';
 import { useAvatar } from './avatar-store';
 import { TaskDetail } from './task-detail';
-import { ThemeSettingsPage, useThemeSync } from './theme-settings';
+import { ThemeSettingsPage, ThemeToggle, useThemeSync } from './theme-settings';
 
 export type { Props } from './screen-kit';
 
 const nav: [string, string][] = [['/', 'Ana sayfa'], ['/islerim', 'İşlerim'], ['/actiklarim', 'Açtıklarım'], ['/raporlar', 'Raporlar'], ['/ekip', 'Ekip']];
 
+// Ana sayfadaki bölüm ikonları satırın üzerine gelince (veya klavyeyle odaklanınca) kendine özgü hareket eder.
+// motion-safe: hareketi azaltmayı seçen kullanıcılarda ikon yerinde kalır.
+const iconMotion = 'transition-transform duration-300 ease-out';
 const departments = [
-  { slug: 'teknik', title: 'Teknik Destek', desc: 'Site, sunucu, alan adı ve hata bildirimleri.', Icon: Wrench },
-  { slug: 'grafik', title: 'Grafik Tasarım', desc: 'Banner, sosyal medya, katalog ve revizeler.', Icon: Palette },
-  { slug: 'diger', title: 'Diğer Talepler', desc: 'Ekip içi bilgi, onay ve koordinasyon işleri.', Icon: FolderOpen },
+  { slug: 'teknik', title: 'Teknik Destek', desc: 'Site, sunucu, alan adı ve hata bildirimleri.', Icon: Wrench, motion: 'motion-safe:group-hover:-rotate-45 motion-safe:group-focus-within:-rotate-45' },
+  { slug: 'grafik', title: 'Grafik Tasarım', desc: 'Banner, sosyal medya, katalog ve revizeler.', Icon: Palette, motion: 'motion-safe:group-hover:rotate-12 motion-safe:group-hover:scale-115 motion-safe:group-focus-within:rotate-12 motion-safe:group-focus-within:scale-115' },
+  { slug: 'diger', title: 'Diğer Talepler', desc: 'Ekip içi bilgi, onay ve koordinasyon işleri.', Icon: FolderOpen, motion: 'motion-safe:group-hover:-translate-y-1 motion-safe:group-focus-within:-translate-y-1' },
 ] as const;
 
 const subtitles: Record<string, string> = {
@@ -44,6 +47,8 @@ const subtitles: Record<string, string> = {
 export default function WorkflowScreen(p: Props) {
   const [route, setRoute] = useState('/'), [search, setSearch] = useState(''), [filter, setFilter] = useState('Tümü'), [layout, setLayout] = useState('board'), [priority, setPriority] = useState('Tümü'), [from, setFrom] = useState(''), [to, setTo] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  // Üst menüden tema değişince Ayarlar sayfası (açıksa) kayıtlı seçimi yeniden okusun.
+  const [themeVersion, setThemeVersion] = useState(0);
   useThemeSync();
   const { avatarSrc } = useAvatar(p.person.id);
   useEffect(() => { const read = () => setRoute(window.location.pathname); read(); window.addEventListener('popstate', read); return () => window.removeEventListener('popstate', read); }, []);
@@ -125,6 +130,7 @@ export default function WorkflowScreen(p: Props) {
           </a>
           <nav className="hidden h-full items-stretch gap-5 md:flex" aria-label="Ana menü">{navLinks(false)}</nav>
           <div className="ml-auto flex items-center gap-1">
+            <ThemeToggle onToggle={() => setThemeVersion(v => v + 1)} />
             <Button variant="ghost" size="icon" aria-label="Ayarlar" aria-current={settingsPage ? 'page' : undefined} className={cn(settingsPage && 'bg-accent text-accent-foreground')} onClick={() => go('/ayarlar')}>
               <Settings />
             </Button>
@@ -299,7 +305,7 @@ export default function WorkflowScreen(p: Props) {
 
         {team && <Team p={p} go={go} />}
 
-        {settingsPage && <ThemeSettingsPage person={p.person} />}
+        {settingsPage && <ThemeSettingsPage key={themeVersion} person={p.person} />}
 
         {logs && (
           <Panel
@@ -392,11 +398,11 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
         <section>
           <h2 className="mb-2 text-lg font-semibold">Bölümler</h2>
           <ul className="divide-y border-y">
-            {departments.map(({ slug, title, desc, Icon }) => {
+            {departments.map(({ slug, title, desc, Icon, motion }) => {
               const open = p.data.tasks.filter(t => t.category === paths[slug] && !t.archived_at && workflowState(t) !== 'Tamamlandı').length;
               return (
-                <li key={slug} className="flex flex-wrap items-center gap-4 py-4">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"><Icon className="size-5" /></span>
+                <li key={slug} className="group flex flex-wrap items-center gap-4 py-4">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground"><Icon className={cn('size-5', iconMotion, motion)} /></span>
                   <a
                     href={'/alan/' + slug} onClick={e => { e.preventDefault(); go('/alan/' + slug); }}
                     className="min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -409,8 +415,8 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
                 </li>
               );
             })}
-            <li className="flex flex-wrap items-center gap-4 py-4">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground"><BookOpen className="size-5" /></span>
+            <li className="group flex flex-wrap items-center gap-4 py-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground"><BookOpen className={cn('size-5', iconMotion, 'motion-safe:group-hover:-rotate-12 motion-safe:group-hover:scale-110 motion-safe:group-focus-within:-rotate-12 motion-safe:group-focus-within:scale-110')} /></span>
               <a href="/nasil-yapilir" onClick={e => { e.preventDefault(); go('/nasil-yapilir'); }} className="min-w-0 flex-1 rounded focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
                 <span className="block font-display text-lg font-semibold hover:underline">Nasıl yapılır</span>
                 <span className="block text-sm text-muted-foreground">Ekibin yazdığı adım adım rehberler.</span>

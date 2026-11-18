@@ -1,7 +1,7 @@
 'use client';
 // Ayarlar sayfası: görünüm tercihleri. Yalnızca CSS değişkenleri değişir; shadcn stili (radix-nova) ve iş mantığı aynı kalır.
-import { useEffect, useState } from 'react';
-import { MessageSquare, RotateCcw } from 'lucide-react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { MessageSquare, Moon, RotateCcw, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   type ThemeKind, type ThemeOption, type ThemeSettings, defaultTheme, resolveScheme, themeGroups, themeKinds, themeStorageKey,
@@ -45,6 +45,34 @@ function applySetting(kind: ThemeKind, value: string) {
   } catch {
     // Depolama kapalıysa seçim yalnızca bu oturumda geçerli olur.
   }
+}
+
+// Ekrandaki gerçek renk şeması: <html> üzerindeki "dark" sınıfı. Ayarlar sayfası, sistem ayarı
+// veya üst menüdeki düğme değiştirdiğinde düğmenin simgesi de kendiliğinden güncellenir.
+function subscribeScheme(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+  return () => observer.disconnect();
+}
+
+/** Üst menüdeki açık/koyu tema düğmesi. Seçim Ayarlar sayfasındaki "Tema" ile aynı yere kaydedilir. */
+export function ThemeToggle({ onToggle }: { onToggle?: () => void }) {
+  const dark = useSyncExternalStore(subscribeScheme, () => document.documentElement.classList.contains('dark'), () => false);
+  const label = dark ? 'Açık temaya geç' : 'Koyu temaya geç';
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        applySetting('mode', dark ? 'light' : 'dark');
+        onToggle?.();
+      }}
+    >
+      {dark ? <Sun /> : <Moon />}
+    </Button>
+  );
 }
 
 /** "Sistem" teması seçiliyken bilgisayarın açık/koyu ayarı değişirse uygulamayı ona uydurur. */
@@ -186,7 +214,7 @@ export function ThemeSettingsPage({ person }: { person: Profile }) {
             <span className="ml-auto text-sm font-semibold text-muted-foreground">2</span>
           </div>
           <article className="rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Luna Coffee</span><span className="ml-auto">#1042</span></div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Dijitaldesin Reklam Ajansı</span><span className="ml-auto">#1042</span></div>
             <h3 className="mt-1.5 font-sans text-sm leading-snug font-semibold">Kasım kampanyası sosyal medya tasarımları</h3>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full w-1/2 rounded-full bg-state-doing" /></div>
             <footer className="mt-3 flex items-center gap-2">
