@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { Archive, MessageSquare } from 'lucide-react';
-import { type Profile, type Task, canEdit } from '@/lib/domain';
+import { Archive, MessageSquare, Trash2 } from 'lucide-react';
+import { type Profile, type Task, canEdit, canManage } from '@/lib/domain';
 import { type WorkflowState, categoryLabels, taskProgress, workflowPatch, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -149,6 +149,28 @@ function TaskCard({ task, p, open }: { task: Task; p: Props; open: () => void })
       )}
     >
       <CardBody task={task} p={p} />
+      {canManage(task, p.person) && (
+        // Kart sürüklenebilir ve tıklanınca açılır; düğme ve onay penceresi bu olaylara karışmasın.
+        <div
+          className="mt-2 flex justify-end border-t pt-2"
+          onClick={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+          onKeyDown={e => e.stopPropagation()}
+        >
+          <ConfirmAction
+            destructive
+            title="Talep kalıcı olarak silinsin mi?"
+            description={`#${task.number} ${task.title} talebi; yorumları, geçmişi, bildirimleri ve dosyalarıyla birlikte kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+            confirmLabel="Kalıcı olarak sil"
+            onConfirm={() => p.onDeleteTask(task)}
+            trigger={
+              <Button variant="ghost" size="xs" className="text-muted-foreground hover:text-destructive" disabled={p.busy}>
+                <Trash2 /> Sil
+              </Button>
+            }
+          />
+        </div>
+      )}
     </article>
   );
 }
