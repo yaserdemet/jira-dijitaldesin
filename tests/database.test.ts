@@ -156,5 +156,16 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   await db.query('delete from auth.users where id=$1',[ids[1]]);
   assert.equal((await db.query('select 1 from public.profiles where id=$1',[ids[1]])).rows.length,1,'profil satırı kalır');
  });
+ await db.exec('reset role');
+ const realtime=await readFile(new URL('../supabase/migrations/008_realtime.sql',import.meta.url),'utf8');
+ await t.test('realtime yayını uygulama tablolarını içerir, güvenlik logları hariç; tekrar çalıştırılabilir',async()=>{
+  await db.exec(realtime);
+  await db.exec(realtime); // ikinci çalıştırma hata vermez, tabloyu iki kez eklemez
+  const tables=(await db.query<{tablename:string}>("select tablename from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' order by tablename")).rows.map(r=>r.tablename);
+  // Güvenlik logları bilerek yayında yok (yalnızca süper admin görür).
+  assert.deepEqual(tables,['attachments','guides','messages','notifications','profiles','task_events','tasks']);
+  // Not: Realtime'ın RLS süzmesi Supabase sunucusunda olur, PGlite'ta test edilemez.
+  // Uygulama yalnızca INSERT/UPDATE dinler; silme olaylarında Supabase RLS uygulamaz.
+ });
  }finally{await db.close()}
 });

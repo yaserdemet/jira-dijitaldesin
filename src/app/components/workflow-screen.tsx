@@ -322,7 +322,7 @@ export default function WorkflowScreen(p: Props) {
         )}
 
         <footer className="mt-16 border-t pt-4 text-xs text-muted-foreground">
-          {p.demo ? 'Örnek veriler bu tarayıcıya kaydedilir.' : 'İşler ve bildirimler 30 saniyede bir kendiliğinden yenilenir.'}
+          {p.demo ? 'Örnek veriler bu tarayıcıya kaydedilir.' : 'İşler ve bildirimler değiştikçe kendiliğinden güncellenir.'}
         </footer>
       </main>
 
