@@ -213,6 +213,25 @@ export default function Workspace(){
  }
  async function markRead(ids:string[]){const now=new Date().toISOString();if(demo){const next=notices.map(n=>ids.includes(n.id)&&n.recipient_id===person!.id?{...n,read_at:now}:n);setNotices(next);localStorage.setItem('akis-demo-notices',JSON.stringify(next))}else{const {error}=await supabase!.from('notifications').update({read_at:now}).in('id',ids).eq('recipient_id',person!.id);if(error)throw error;await load()}}
  // Denetim kayıtlarını kalıcı siler; veritabanı yalnızca süper admin'e izin verir ve silme işlemini tek kayıtla iz olarak bırakır.
+ // Sunucu uçlarına oturum anahtarıyla istek. Anahtarın süresi dolmak üzereyse önce yenilenir;
+ // sunucu yine de oturumu reddederse (ör. başka sekme yenileme anahtarını kullandı) bir kez yenileyip tekrar dener.
+ async function postWithSession(path:string,body:unknown){
+  const expired='Oturumun sona ermiş. Çıkış yapıp yeniden giriş yap.';
+  const token=async(force:boolean)=>{
+   const {data:{session:s}}=await supabase!.auth.getSession();
+   if(!force&&s&&(s.expires_at??0)*1000>Date.now()+60000)return s.access_token;
+   const {data,error}=await supabase!.auth.refreshSession();
+   if(error||!data.session)throw new Error(expired);
+   return data.session.access_token;
+  };
+  const send=async(force:boolean)=>fetch(path,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${await token(force)}`},body:JSON.stringify(body)});
+  let r=await send(false);
+  if(r.status===401)r=await send(true);
+  const result=await r.json().catch(()=>({error:'Sunucudan yanıt alınamadı. Yeniden deneyin.'}));
+  if(r.status===401)throw new Error(expired);
+  if(!r.ok)throw new Error(result.error??'İşlem tamamlanamadı. Yeniden deneyin.');
+  return result;
+ }
  // Talebi kalıcı siler (yorumlar, geçmiş, bildirimler ve dosyalarıyla). Yalnızca açan kişi veya süper admin;
  // asıl kontrol veritabanında (010_delete_task.sql), dosyalar sunucu ucunda depodan silinir.
  async function deleteTask(t:Task){
@@ -232,10 +251,7 @@ export default function Workspace(){
    notify('Talep kalıcı olarak silindi.');
    return;
   }
-  const {data:{session:s}}=await supabase!.auth.getSession();
-  const r=await fetch('/api/tasks/delete',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${s?.access_token}`},body:JSON.stringify({id:t.id})});
-  const result=await r.json().catch(()=>({error:'Talep silinemedi. Yeniden deneyin.'}));
-  if(!r.ok)throw new Error(result.error??'Talep silinemedi. Yeniden deneyin.');
+  const result=await postWithSession('/api/tasks/delete',{id:t.id});
   if(location.pathname==='/talep/'+t.id)navigate('/');
   await load();
   notify(result.fileError?'Talep silindi, ancak bazı dosyalar depodan silinemedi.':'Talep kalıcı olarak silindi.');
@@ -264,7 +280,7 @@ export default function Workspace(){
  async function adminAction(body:Record<string,unknown>){if(person?.role!=='super_admin')throw new Error('Süper admin yetkisi gerekli.');if(demo){if(body.action==='responsibilities'){
    commit({...demoData.current,profiles:data.profiles.map(p=>p.id===body.id?{...p,technical_assignee:Boolean(body.technical),design_assignee:Boolean(body.design)}:p),logs:[log('Bölüm sorumluları güncellendi',String(body.id)),...data.logs]});
    notify('Bölüm sorumluları güncellendi.');
-  }else if(body.action==='delete'){if(body.id===person.id)throw new Error('Kendi hesabınızı silemezsiniz.');const target=demoData.current.profiles.find(p=>p.id===body.id);if(!target||target.role==='super_admin')throw new Error('Süper admin hesabı bu ekrandan silinemez.');const now=new Date().toISOString();commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,name:'Silinmiş kullanıcı',email:'',team:'',active:false,technical_assignee:false,design_assignee:false,deleted_at:now}:p),tasks:demoData.current.tasks.map(t=>t.assignee_id===body.id&&!['Tamamlandı','İptal'].includes(t.status)?{...t,assignee_id:null}:t),logs:[log('Kullanıcı kalıcı olarak silindi',String(body.id),target.name),...demoData.current.logs]});notify('Kullanıcı kalıcı olarak silindi.')}else if(body.action==='password'){notify('Deneme modunda şifre kaydedilmez.')}else if(body.action==='create'){const p:Profile={id:uid(),name:String(body.name),email:String(body.email),team:String(body.team),role:'employee',active:true};if(data.profiles.some(x=>x.email.toLowerCase()===p.email.toLowerCase()))throw new Error('Bu e-posta zaten kayıtlı.');commit({...demoData.current,profiles:[...demoData.current.profiles,p],logs:[log('Deneme kullanıcısı eklendi',p.id,p.email),...demoData.current.logs]});notify('Deneme kullanıcısı eklendi; e-posta gönderilmedi.')}else{if(body.id===person.id)throw new Error('Kendi hesabınızı kapatamazsınız.');commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,active:Boolean(body.active)}:p),logs:[log(body.active?'Hesap etkinleştirildi':'Hesap erişimi kapatıldı',String(body.id)),...demoData.current.logs]});notify('Kullanıcı güncellendi.')}}else{const {data:{session:s}}=await supabase!.auth.getSession();const r=await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${s?.access_token}`},body:JSON.stringify(body)});const result=await r.json();if(!r.ok)throw new Error(result.error);notify(body.action==='create'?'Kullanıcı oluşturuldu. E-posta ve şifresiyle giriş yapabilir.':body.action==='password'?'Şifre güncellendi.':body.action==='delete'?'Kullanıcı kalıcı olarak silindi.':'Kullanıcı güncellendi.');await load()}setAddingUser(false);setPwTarget(null)}
+  }else if(body.action==='delete'){if(body.id===person.id)throw new Error('Kendi hesabınızı silemezsiniz.');const target=demoData.current.profiles.find(p=>p.id===body.id);if(!target||target.role==='super_admin')throw new Error('Süper admin hesabı bu ekrandan silinemez.');const now=new Date().toISOString();commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,name:'Silinmiş kullanıcı',email:'',team:'',active:false,technical_assignee:false,design_assignee:false,deleted_at:now}:p),tasks:demoData.current.tasks.map(t=>t.assignee_id===body.id&&!['Tamamlandı','İptal'].includes(t.status)?{...t,assignee_id:null}:t),logs:[log('Kullanıcı kalıcı olarak silindi',String(body.id),target.name),...demoData.current.logs]});notify('Kullanıcı kalıcı olarak silindi.')}else if(body.action==='password'){notify('Deneme modunda şifre kaydedilmez.')}else if(body.action==='create'){const p:Profile={id:uid(),name:String(body.name),email:String(body.email),team:String(body.team),role:'employee',active:true};if(data.profiles.some(x=>x.email.toLowerCase()===p.email.toLowerCase()))throw new Error('Bu e-posta zaten kayıtlı.');commit({...demoData.current,profiles:[...demoData.current.profiles,p],logs:[log('Deneme kullanıcısı eklendi',p.id,p.email),...demoData.current.logs]});notify('Deneme kullanıcısı eklendi; e-posta gönderilmedi.')}else{if(body.id===person.id)throw new Error('Kendi hesabınızı kapatamazsınız.');commit({...demoData.current,profiles:demoData.current.profiles.map(p=>p.id===body.id?{...p,active:Boolean(body.active)}:p),logs:[log(body.active?'Hesap etkinleştirildi':'Hesap erişimi kapatıldı',String(body.id)),...demoData.current.logs]});notify('Kullanıcı güncellendi.')}}else{await postWithSession('/api/admin/users',body);notify(body.action==='create'?'Kullanıcı oluşturuldu. E-posta ve şifresiyle giriş yapabilir.':body.action==='password'?'Şifre güncellendi.':body.action==='delete'?'Kullanıcı kalıcı olarak silindi.':'Kullanıcı güncellendi.');await load()}setAddingUser(false);setPwTarget(null)}
  async function changePassword(target:Profile,password:string){if(password.length<8)throw new Error('Şifre en az 8 karakter olmalı.');if(!demo&&target.id===person?.id){const {error}=await supabase!.auth.updateUser({password});if(error)throw error;notify('Şifren güncellendi.');setPwTarget(null);return}await adminAction({action:'password',id:target.id,password})}
  // Oturum var ama profil henüz gelmediyse giriş ekranı değil yükleyici gösterilir; aksi hâlde yenilemede giriş ekranı kısa süre görünür.
  if(!ready||(session&&!person&&!error))return <PageLoader />;
