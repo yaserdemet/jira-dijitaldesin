@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { IntegrationCanvas } from './integration-canvas';
 import { designSizes, requestForms } from './request-forms';
 import { priorityTone } from './screen-kit';
+import { useFirstVisitTour } from './tour';
 
 export const maxRequestFiles = 10;
 const NONE = '__none';
@@ -103,7 +104,9 @@ export function Login({ busy, configured, allowDemo, onDemo, error, run, session
   );
 }
 
-export function CreateDialog({ profiles, category, onCategory, busy, error, onClearError, onClose, onSubmit }: {
+export function CreateDialog({ profiles, category, onCategory, busy, error, onClearError, onClose, onSubmit, tourUser }: {
+  /** Tanıtım turunun "görüldü" anahtarı; formu ilk açan kullanıcıya tur gösterilir. */
+  tourUser: string;
   profiles: Profile[]; category: Category; onCategory: (c: Category) => void; busy: boolean; error: string; onClearError: () => void;
   onClose: () => void; onSubmit: (input: TaskInput, files: File[]) => void;
 }) {
@@ -120,6 +123,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
   const [fields, setFields] = useState<Record<string, string>>({});
   const brief = requestForms[category];
   const visibleFields = brief.fields.filter(field => !field.when || requestTypes.includes(field.when));
+  useFirstVisitTour('talep', tourUser);
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -167,7 +171,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
           <DialogHeader className="border-b px-6 pt-6 pb-4">
             <DialogTitle className="text-xl">Yeni talep</DialogTitle>
             <DialogDescription>Talebi açtığında bütün ekip görebilir.</DialogDescription>
-            <div className="mt-3 inline-flex rounded-lg bg-secondary p-0.5" role="radiogroup" aria-label="Talep bölümü">
+            <div className="mt-3 inline-flex rounded-lg bg-secondary p-0.5" role="radiogroup" aria-label="Talep bölümü" data-tour="talep-bolum">
               {categories.map(c => (
                 <button
                   key={c} type="button" role="radio" aria-checked={c === category} disabled={busy}
@@ -203,7 +207,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
               </div>
             )}
 
-            <div className="grid gap-2">
+            <div className="grid gap-2" data-tour="talep-baslik">
               <Label htmlFor="task-title">Başlık</Label>
               <Input id="task-title" autoFocus required minLength={3} maxLength={180} value={input.title} placeholder={brief.titleExample} onChange={e => setInput({ ...input, title: e.target.value })} />
             </div>
@@ -242,7 +246,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
               </div>
             ))}
 
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-5 sm:grid-cols-2" data-tour="talep-sorumlu">
               <div className="grid gap-2">
                 <Label htmlFor="task-brand">Müşteri veya marka</Label>
                 <Input id="task-brand" required maxLength={100} value={input.brand} placeholder="Marka adı ya da İç Ekip" onChange={e => setInput({ ...input, brand: e.target.value })} />
@@ -259,7 +263,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
               </div>
             </div>
 
-            <fieldset>
+            <fieldset data-tour="talep-oncelik">
               <legend className="mb-2 flex min-h-6 items-center gap-2 text-sm font-medium">
                 Öncelik
                 {nudge && (
@@ -291,7 +295,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
               </div>
             </fieldset>
 
-            <fieldset>
+            <fieldset data-tour="talep-dosya">
               <legend className="mb-1 text-sm font-medium">{brief.attachmentLabel}</legend>
               <p className="mb-2 text-xs text-muted-foreground">{files.length}/{maxRequestFiles} dosya. PDF, PNG, JPG veya WebP; dosya başına en fazla 20 MB.</p>
               {files.length > 0 && (
@@ -326,7 +330,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
             <FormError message={error} onClear={onClearError} />
           </div>
 
-          <DialogFooter className="sticky bottom-0 mx-0 mb-0 rounded-b-xl border-t bg-card px-6 py-4">
+          <DialogFooter className="sticky bottom-0 mx-0 mb-0 rounded-b-xl border-t bg-card px-6 py-4" data-tour="talep-gonder">
             <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>Vazgeç</Button>
             <Button type="submit" disabled={busy}>{busy ? <LoaderCircle className="animate-spin" /> : <Plus />} Talebi aç</Button>
           </DialogFooter>

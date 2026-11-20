@@ -263,6 +263,65 @@
   to { background-color: transparent; box-shadow: 0 0 0 3px transparent; }
 }
 
+/*
+  Tanıtım turu (driver.js, tour.ts). Kütüphanenin beyaz kutusu belirteçlerle boyanır, böylece
+  açık/koyu tema ve kullanıcının seçtiği ana renk turda da geçerli olur.
+  .akis-tour öneki, CSS yükleme sırasından bağımsız olarak kütüphane stilini ezmek için.
+*/
+.akis-tour.driver-popover {
+  font-family: var(--font-ui-face), ui-sans-serif, sans-serif;
+  color: var(--popover-foreground);
+  background-color: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  padding: 18px;
+  max-width: min(340px, calc(100vw - 32px));
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.35);
+  /* Radix pencereleri açıkken gövdeye pointer-events: none verir; tur kutusu (gövdede) tıklanabilir kalsın. */
+  pointer-events: auto;
+}
+.akis-tour .driver-popover-title {
+  font-family: var(--font-display-face), ui-sans-serif, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  padding-right: 24px;
+}
+.akis-tour .driver-popover-description {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  line-height: 1.55;
+}
+.akis-tour .driver-popover-description b { color: var(--popover-foreground); font-weight: 600; }
+/* Karşılama ve kapanışta turu anlatan kişinin avatarı. */
+.akis-tour .akis-tour-host { display: flex; align-items: center; gap: 12px; }
+.akis-tour .akis-tour-host img { width: 48px; height: 48px; flex-shrink: 0; border-radius: 9999px; background-color: var(--accent); object-fit: cover; }
+.akis-tour .driver-popover-close-btn { color: var(--muted-foreground); top: 6px; right: 6px; border-radius: 6px; }
+.akis-tour .driver-popover-close-btn:hover,
+.akis-tour .driver-popover-close-btn:focus-visible { color: var(--popover-foreground); background-color: var(--muted); }
+.akis-tour .driver-popover-footer { margin-top: 16px; align-items: center; }
+.akis-tour .driver-popover-progress-text { color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; }
+.akis-tour .driver-popover-navigation-btns { gap: 6px; }
+.akis-tour .driver-popover-footer-btn {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-shadow: none;
+  padding: 6px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  background-color: var(--card);
+  color: var(--foreground);
+}
+.akis-tour .driver-popover-footer-btn:hover { background-color: var(--muted); }
+.akis-tour .driver-popover-footer-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }
+.akis-tour .driver-popover-next-btn { background-color: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.akis-tour .driver-popover-next-btn:hover { background-color: color-mix(in oklab, var(--primary) 88%, black); }
+.akis-tour .driver-popover-btn-disabled { opacity: 0.45; }
+.akis-tour .driver-popover-arrow-side-left { border-left-color: var(--popover); }
+.akis-tour .driver-popover-arrow-side-right { border-right-color: var(--popover); }
+.akis-tour .driver-popover-arrow-side-top { border-top-color: var(--popover); }
+.akis-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--popover); }
+
 /* Giriş ekranındaki entegrasyon tuvali: düğümler yanlardan gelir, bağlantılar çizilir ve akar. */
 .canvas-node { animation: canvas-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .canvas-from-left { --canvas-x: -20px; }

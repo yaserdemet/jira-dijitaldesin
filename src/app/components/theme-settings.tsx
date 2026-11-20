@@ -140,7 +140,7 @@ export function ThemeSettingsPage({ person }: { person: Profile }) {
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="divide-y rounded-xl border bg-card">
-        <section className="grid gap-4 p-5 md:grid-cols-[220px_minmax(0,1fr)]">
+        <section className="grid gap-4 p-5 md:grid-cols-[220px_minmax(0,1fr)]" data-tour="ayar-avatar">
           <div>
             <h2 id="theme-avatar" className="font-sans text-base font-semibold">Avatar</h2>
             <p className="mt-1 text-sm text-muted-foreground">Üst menüde senin yerine görünür. Seçim bu tarayıcıda saklanır.</p>
@@ -173,7 +173,7 @@ export function ThemeSettingsPage({ person }: { person: Profile }) {
         {sections.map(({ kind, title, description, lightOnly }) => {
           const disabled = lightOnly && dark;
           return (
-            <section key={kind} className="grid gap-4 p-5 md:grid-cols-[220px_minmax(0,1fr)]" aria-disabled={disabled || undefined}>
+            <section key={kind} className="grid gap-4 p-5 md:grid-cols-[220px_minmax(0,1fr)]" data-tour={`ayar-${kind}`} aria-disabled={disabled || undefined}>
               <div>
                 <h2 id={`theme-${kind}`} className="font-sans text-base font-semibold">{title}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{disabled ? 'Koyu temada kullanılmaz; koyu temanın kendi zemini ve gri tonları vardır.' : description}</p>
@@ -207,7 +207,7 @@ export function ThemeSettingsPage({ person }: { person: Profile }) {
 
       <aside className="lg:sticky lg:top-20 lg:self-start">
         <h2 className="font-sans text-sm font-semibold text-muted-foreground">Önizleme</h2>
-        <div className="mt-3 rounded-xl bg-secondary/70 p-3">
+        <div className="mt-3 rounded-xl bg-secondary/70 p-3" data-tour="ayar-onizleme">
           <div className="flex items-center gap-2 px-1 pb-3">
             <span className="h-4 w-1 rounded-full bg-state-doing" />
             <span className="font-display text-[15px] font-semibold">Yapılıyor</span>
@@ -229,7 +229,7 @@ export function ThemeSettingsPage({ person }: { person: Profile }) {
           <Button variant="outline">Vazgeç</Button>
           <Button variant="link" className="px-1">Bağlantı</Button>
         </div>
-        <div className="mt-6 border-t pt-4">
+        <div className="mt-6 border-t pt-4" data-tour="ayar-sifirla">
           <Button variant="ghost" className="-ml-2 text-muted-foreground" disabled={!changed} onClick={reset}><RotateCcw /> Varsayılana dön</Button>
           <p className="mt-2 text-xs text-muted-foreground">Ayarların yalnızca bu tarayıcıda saklanır; başka bir cihazda varsayılan görünüm açılır.</p>
         </div>

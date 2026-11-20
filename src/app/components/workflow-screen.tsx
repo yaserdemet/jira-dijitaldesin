@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Archive, ArrowLeft, Bell, BookOpen, Check, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Trash2, Wrench } from 'lucide-react';
+import { Archive, ArrowLeft, Bell, BookOpen, Check, Compass, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Trash2, Wrench } from 'lucide-react';
 import { type Task, canAssignCategory, reportCsv } from '@/lib/domain';
 import { type Notice, type WorkflowState, categoryLabels, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Avatar, ConfirmAction, EmptyState, Panel, type Props, formatDate, paths
 import { useAvatar } from './avatar-store';
 import { TaskDetail } from './task-detail';
 import { ThemeSettingsPage, ThemeToggle, useThemeSync } from './theme-settings';
+import { forgetTours, startTour, useFirstVisitTour } from './tour';
 
 export type { Props } from './screen-kit';
 
@@ -52,6 +53,19 @@ export default function WorkflowScreen(p: Props) {
   useThemeSync();
   const { avatarSrc } = useAvatar(p.person.id);
   useEffect(() => { const read = () => setRoute(window.location.pathname); read(); window.addEventListener('popstate', read); return () => window.removeEventListener('popstate', read); }, []);
+  // Deneme modunda kullanıcı değiştirmek turu yeniden açmasın diye tek anahtar kullanılır.
+  const tourUser = p.demo ? 'demo' : p.person.id;
+  const firstName = p.person.name.split(' ')[0];
+  // Yeni kullanıcı ana sayfaya ve ayarlara ilk geldiğinde tanıtım turu kendiliğinden açılır.
+  useFirstVisitTour('ana', tourUser, route === '/', firstName);
+  useFirstVisitTour('ayarlar', tourUser, route === '/ayarlar');
+  function replayTour() {
+    // Ayarlar ve yeni talep turları, o ekranlar bir sonraki açılışında yeniden gösterilir.
+    forgetTours(['ayarlar', 'talep'], tourUser);
+    go('/');
+    // Menü kapanıp ana sayfa çizildikten sonra başlat.
+    setTimeout(() => startTour('ana', tourUser, firstName), 300);
+  }
   function go(path: string) { window.history.pushState(null, '', path); setRoute(new URL(path, window.location.origin).pathname); setSearch(''); setFilter('Tümü'); setPriority('Tümü'); setMenuOpen(false); window.scrollTo({ top: 0 }); }
   useEffect(() => { const id = new URLSearchParams(location.search).get('yorum'); if (id) { const timer = setTimeout(() => { const el = document.getElementById('yorum-' + id); el?.classList.add('wf-highlight'); el?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 150); return () => clearTimeout(timer); } }, [route, p.data.messages.length]);
   const taskPath = (t: Task) => '/talep/' + t.id;
@@ -76,7 +90,6 @@ export default function WorkflowScreen(p: Props) {
 
   const counts = Object.fromEntries(workflowStates.map(s => [s, p.data.tasks.filter(t => inScope(t) && workflowState(t) === s).length])) as Record<WorkflowState, number>;
   const archivedCount = p.data.tasks.filter(t => t.archived_at && (!category || t.category === category) && (!mine || t.assignee_id === p.person.id) && (!created || t.creator_id === p.person.id)).length;
-  const firstName = p.person.name.split(' ')[0];
   const title = selected ? selected.title : guide ? guide.title : category ? categoryLabels[category] : titles[route] ?? 'Sayfa bulunamadı';
   const subtitle = selected ? `#${selected.number}, ${selected.brand}` : category ? departments.find(d => paths[d.slug] === category)?.desc : subtitles[route];
 
@@ -118,7 +131,7 @@ export default function WorkflowScreen(p: Props) {
         <div className="mx-auto flex h-14 max-w-[1360px] items-center gap-6 px-4 sm:px-6">
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="-ml-2 md:hidden" aria-label="Menüyü aç"><Menu /></Button>
+              <Button variant="ghost" size="icon" className="-ml-2 md:hidden" aria-label="Menüyü aç" data-tour="menu-mobil"><Menu /></Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-4">
               <SheetTitle className="mb-4">Menü</SheetTitle>
@@ -128,13 +141,13 @@ export default function WorkflowScreen(p: Props) {
           <a href="/" onClick={e => { e.preventDefault(); go('/'); }} className="shrink-0 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 rounded">
             <img src="/logo.svg" alt="dijitaldesin" className="h-11 w-auto dark:invert" />
           </a>
-          <nav className="hidden h-full items-stretch gap-5 md:flex" aria-label="Ana menü">{navLinks(false)}</nav>
+          <nav className="hidden h-full items-stretch gap-5 md:flex" aria-label="Ana menü" data-tour="menu">{navLinks(false)}</nav>
           <div className="ml-auto flex items-center gap-1">
             <ThemeToggle onToggle={() => setThemeVersion(v => v + 1)} />
-            <Button variant="ghost" size="icon" aria-label="Ayarlar" aria-current={settingsPage ? 'page' : undefined} className={cn(settingsPage && 'bg-accent text-accent-foreground')} onClick={() => go('/ayarlar')}>
+            <Button variant="ghost" size="icon" aria-label="Ayarlar" data-tour="ayarlar" aria-current={settingsPage ? 'page' : undefined} className={cn(settingsPage && 'bg-accent text-accent-foreground')} onClick={() => go('/ayarlar')}>
               <Settings />
             </Button>
-            <Button variant="ghost" size="icon" className="relative" aria-label={`Bildirimler, ${unread.length} okunmamış`} onClick={() => go('/bildirimler')}>
+            <Button variant="ghost" size="icon" className="relative" data-tour="bildirimler" aria-label={`Bildirimler, ${unread.length} okunmamış`} onClick={() => go('/bildirimler')}>
               <Bell />
               {unread.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-white">{unread.length}</span>
@@ -143,7 +156,7 @@ export default function WorkflowScreen(p: Props) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  type="button"
+                  type="button" data-tour="hesap"
                   className="relative rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                   aria-label={waiting ? `Hesap menüsü, seni bekleyen ${waiting} iş var` : 'Hesap menüsü'}
                   title={waiting ? `Seni bekleyen ${waiting} iş var` : undefined}
@@ -164,6 +177,7 @@ export default function WorkflowScreen(p: Props) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => go('/ayarlar')}><Settings /> Ayarlar</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => p.onPassword(p.person)}>Şifremi değiştir</DropdownMenuItem>
+                <DropdownMenuItem onSelect={replayTour}><Compass /> Tanıtım turu</DropdownMenuItem>
                 <DropdownMenuItem onSelect={p.onLogout}><LogOut /> Çıkış yap</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -380,7 +394,7 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
           <p className="text-muted-foreground">Hoş geldin, {firstName}.</p>
           <h1 className="mt-2 max-w-[18ch] text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl">{sentence}</h1>
           <div className="mt-6 flex flex-wrap gap-2">
-            <Button size="lg" onClick={() => p.onCreate('Teknik İşlemler')}><Plus /> Yeni talep</Button>
+            <Button size="lg" data-tour="yeni-talep" onClick={() => p.onCreate('Teknik İşlemler')}><Plus /> Yeni talep</Button>
             <Button size="lg" variant="outline" className="bg-card" onClick={() => go('/islerim')}>İşlerimi göster</Button>
           </div>
         </section>
@@ -395,7 +409,7 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
           </section>
         )}
 
-        <section>
+        <section data-tour="bolumler">
           <h2 className="mb-2 text-lg font-semibold">Bölümler</h2>
           <ul className="divide-y border-y">
             {departments.map(({ slug, title, desc, Icon, motion }) => {
@@ -428,7 +442,7 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
         </section>
       </div>
 
-      <aside className="lg:pt-4">
+      <aside className="lg:pt-4" data-tour="son-adimlar">
         <h2 className="text-lg font-semibold">Ekibin son adımları</h2>
         {events.length ? (
           <ol className="mt-4 ml-1 border-l border-foreground/15 pl-5">
