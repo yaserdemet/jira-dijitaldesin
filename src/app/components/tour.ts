@@ -195,7 +195,7 @@ const tours: Record<TourName, (firstName: string) => DriveStep[]> = {
       element: '[data-tour="talep-sorumlu"]',
       popover: {
         title: 'Müşteri ve sorumlu',
-        description: 'İşin hangi marka için olduğunu yaz. Sorumluyu bilmiyorsan <b>Şimdilik atama</b> olarak bırak; ekip üstlenir.',
+        description: 'İşin hangi marka için olduğunu yaz. Birden fazla sorumlu seçebilirsin; bilmiyorsan <b>Şimdilik atama</b> olarak bırak, ekip üstlenir.',
         side: 'top',
       },
     },

@@ -10,7 +10,7 @@ export function seed():Data {
  const rows=[
  ['Kasım kampanyası sosyal medya tasarımları','Grafik İşlemleri','Luna Coffee','Yüksek','İşlemde','demo-1',2],
  ['Web sitesi iletişim formu kontrolü','Teknik İşlemler','Nova Studio','Acil','Yeni','demo-2',-1],
- ['Black Friday reklam seti revizesi','Grafik İşlemleri','Urban Wear','Yüksek','Revize İstendi','demo-4',1],
+ ['Black Friday reklam seti revizesi','Grafik İşlemleri','Urban Wear','Yüksek','Revize İstendi','demo-4,demo-1',1],
  ['Aylık müşteri toplantısı hazırlığı','Diğer Talepler','İç Ekip','Normal','Atandı','demo-5',4],
  ['Yeni ürün kataloğu PDF tasarımı','Grafik İşlemleri','Maison Living','Normal','Onay Bekliyor','demo-1',0],
  ['Meta piksel ve dönüşüm kontrolü','Teknik İşlemler','Urban Wear','Yüksek','İşlemde','demo-2',1],
@@ -18,6 +18,6 @@ export function seed():Data {
  ['Instagram hikâye şablonları','Grafik İşlemleri','Nova Studio','Normal','Bilgi Bekliyor','demo-4',3],
  ['Yeni çalışan erişimlerinin hazırlanması','Teknik İşlemler','İç Ekip','Normal','Tamamlandı','demo-2',-3]
  ];
- const tasks=rows.map((r,i)=>({id:`sample-${i}`,number:1042-i,title:r[0],category:r[1],brand:r[2],priority:r[3],status:r[4],assignee_id:r[5],creator_id:i%2?'demo-admin':'demo-3',description:'İlgili marka için talep edilen çalışmanın hazırlanması gerekiyor. Çalışmayı tamamladıktan sonra teslim dosyalarını buraya ekleyip onaya gönderebilirsiniz. Tüm görüşmeleri bu iş üzerinden sürdürelim.',created_at:new Date(Date.now()-(i+1)*86400000).toISOString(),updated_at:new Date().toISOString(),completed_at:r[4]==='Tamamlandı'?new Date().toISOString():null,revision_count:r[4]==='Revize İstendi'?1:0})) as Task[];
+ const tasks=rows.map((r,i)=>({id:`sample-${i}`,number:1042-i,title:r[0],category:r[1],brand:r[2],priority:r[3],status:r[4],assignee_ids:String(r[5]).split(','),creator_id:i%2?'demo-admin':'demo-3',description:'İlgili marka için talep edilen çalışmanın hazırlanması gerekiyor. Çalışmayı tamamladıktan sonra teslim dosyalarını buraya ekleyip onaya gönderebilirsiniz. Tüm görüşmeleri bu iş üzerinden sürdürelim.',created_at:new Date(Date.now()-(i+1)*86400000).toISOString(),updated_at:new Date().toISOString(),completed_at:r[4]==='Tamamlandı'?new Date().toISOString():null,revision_count:r[4]==='Revize İstendi'?1:0})) as Task[];
  return {profiles,tasks,events:[],messages:[{id:'sample-comment',task_id:'sample-0',author_id:'demo-3',body:'Ana görselde ürünün öne çıkmasını istiyoruz. Kare ve hikâye boyutlarını birlikte hazırlayabilir miyiz?',kind:'comment',created_at:new Date().toISOString()}],attachments:[],logs:[{id:'seed-log',actor_id:'demo-admin',action:'Örnek çalışma alanı oluşturuldu',entity_id:'demo',details:'Bu alandaki kişi ve işler örnektir.',created_at:new Date().toISOString()}]};
 }

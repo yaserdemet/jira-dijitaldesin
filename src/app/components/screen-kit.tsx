@@ -1,13 +1,17 @@
 'use client';
 // Ekranların ortak görsel parçaları. İş kuralı içermez; yalnızca veriyi gösterir.
 import { useState, type ReactNode } from 'react';
-import type { Attachment, Category, Data, Message, Profile, Task } from '@/lib/domain';
+import { type Attachment, type Category, type Data, type Message, type Profile, type Task, maxAssignees } from '@/lib/domain';
 import { type Guide, type Notice, type WorkflowState, priorityClass, stateLabel, taskProgress, workflowState } from '@/lib/workflow';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { ChevronDown } from 'lucide-react';
 
 /** Tam sayfa yükleme ekranı: dijitaldesin.com'daki yükleyicinin aynısı (kayan çubuk + yanıp sönen yazı). */
 export function PageLoader({ label = 'Yükleniyor...' }: { label?: string }) {
@@ -115,6 +119,60 @@ export function Avatar({ name, src, size = 'md' }: { name?: string; src?: string
     >
       {name ? name.trim().slice(0, 1).toLocaleUpperCase('tr') : '?'}
     </span>
+  );
+}
+
+/**
+ * Birden fazla sorumlu seçimi. keepOpen: formda liste her işaretlemede açık kalır;
+ * talep ayrıntısında ise her seçim hemen kaydedildiği için liste kapanır.
+ */
+export function AssigneePicker({ id, profiles, value, onChange, disabled, emptyLabel, keepOpen }: {
+  id: string; profiles: Profile[]; value: string[]; onChange: (ids: string[]) => void;
+  disabled?: boolean; emptyLabel: string; keepOpen?: boolean;
+}) {
+  const names = value.flatMap(v => profiles.find(p => p.id === v)?.name ?? []);
+  const full = value.length >= maxAssignees;
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild disabled={disabled}>
+        <button
+          id={id}
+          type="button"
+          className="flex min-h-8 w-full items-center gap-1.5 rounded-lg border border-input bg-transparent py-1.5 pr-2 pl-2.5 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:hover:bg-input/50"
+        >
+          <span className={cn('min-w-0 flex-1 truncate', !names.length && 'text-muted-foreground')}>
+            {names.length ? names.join(', ') : emptyLabel}
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="max-h-72">
+        {profiles.map(person => {
+          const checked = value.includes(person.id);
+          return (
+            <DropdownMenuCheckboxItem
+              key={person.id}
+              checked={checked}
+              disabled={!checked && full}
+              onSelect={keepOpen ? e => e.preventDefault() : undefined}
+              onCheckedChange={on => onChange(on ? [...value, person.id] : value.filter(v => v !== person.id))}
+            >
+              <span className="min-w-0 truncate">
+                {person.name}
+                {person.team && <span className="text-muted-foreground">, {person.team}</span>}
+              </span>
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+        {value.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onChange([])}>Seçimi temizle</DropdownMenuItem>
+          </>
+        )}
+        {full && <p className="px-1.5 py-1 text-xs text-muted-foreground">En fazla {maxAssignees} kişi seçilebilir.</p>}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

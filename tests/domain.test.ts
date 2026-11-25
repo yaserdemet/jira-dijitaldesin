@@ -9,3 +9,15 @@ test('rapor dışa aktarımı elektronik tablo formüllerini etkisizleştirir',(
 test('boş brief ve bilinmeyen bölüm reddedilir',()=>{const t=seed().tasks[0];assert.equal(taskSchema.safeParse({...t,description:''}).success,false);assert.equal(taskSchema.safeParse({...t,category:'Yanlış'}).success,false)});
 test('bölüm sorumlusu yoksa tüm aktif çalışanlar atanabilir',()=>{const d=seed();const people=d.profiles.map(p=>({...p,technical_assignee:false,design_assignee:false}));assert.equal(assignableProfiles(people,'Teknik İşlemler').length,people.filter(p=>p.active).length);people[2].technical_assignee=true;assert.deepEqual(assignableProfiles(people,'Teknik İşlemler').map(p=>p.id),[people[2].id])});
 test('revize yalnızca çalışılan veya tamamlanan işe istenir; iptal ayrı gösterilir',()=>{assert.equal(canRequestRevision({status:'Atandı'}),false);assert.equal(canRequestRevision({status:'İşlemde'}),true);assert.equal(canRequestRevision({status:'Tamamlandı'}),true);assert.equal(stateLabel({status:'İptal'}),'İptal');assert.equal(stateLabel({status:'Revize İstendi'}),'Sorun Var')});
+test('açıklama isteğe bağlıdır; birden fazla sorumlu tekrarsız kaydedilir ve hepsi düzenleyebilir',()=>{
+ const d=seed();
+ const base={title:'Ortak iş',description:'Talep türü: Diğer',category:'Diğer Talepler',brand:'İç Ekip',priority:'Normal'};
+ const parsed=taskSchema.parse({...base,notes:'   ',assignee_ids:['demo-1','demo-2','demo-1']});
+ assert.equal(parsed.notes,null);
+ assert.deepEqual(parsed.assignee_ids,['demo-1','demo-2']);
+ assert.equal(taskSchema.parse({...base,notes:' Ek bilgi ',assignee_ids:[]}).notes,'Ek bilgi');
+ assert.equal(taskSchema.safeParse({...base,assignee_ids:Array.from({length:11},(_,i)=>'p'+i)}).success,false);
+ const shared=d.tasks.find(t=>t.assignee_ids.length>1)!;
+ for(const id of shared.assignee_ids)assert.equal(canEdit(shared,d.profiles.find(p=>p.id===id)!),true);
+ assert.equal(canEdit({...shared,assignee_ids:undefined as unknown as string[],assignee_id:'demo-4'},d.profiles.find(p=>p.id==='demo-4')!),true,'eski deneme verisi');
+});

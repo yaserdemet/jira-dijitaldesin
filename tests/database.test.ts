@@ -246,5 +246,62 @@ test('PostgreSQL yetki politikaları ve revize işlemi',async t=>{
   await login(0);
   await assert.rejects(db.query('select public.delete_task($1)',[someone]),/bulunamadı/);
  });
+ await db.exec('reset role');
+ const migration011=await readFile(new URL('../supabase/migrations/011_notes_and_assignees.sql',import.meta.url),'utf8');
+ await db.exec(migration011);
+ await db.exec(migration011); // tekrar çalıştırılabilir
+ await t.test('talep açıklaması isteğe bağlıdır ve birden fazla sorumlu atanabilir',async()=>{
+  const other=ids[4];
+  type Row={assignee_id:string|null;assignee_ids:string[];notes:string|null};
+  const read=async(id:string)=>{await db.exec('reset role');return (await db.query<Row>('select assignee_id,assignee_ids,notes from public.tasks where id=$1',[id])).rows[0]};
+  const create=async(as:number,category:string,assignees:string[],notes:string|null=null)=>{
+   await login(as);
+   return (await db.query<{id:string}>(`insert into public.tasks(title,description,category,brand,creator_id,assignee_ids,notes,status) values('Ortak iş','Örnek açıklama',$1,'İç Ekip',$2,$3,$4,'Atandı') returning id`,[category,ids[as],assignees,notes])).rows[0].id;
+  };
+
+  // Eski kayıtlar listeye taşınmış olmalı.
+  await db.exec('reset role');
+  assert.equal((await db.query('select 1 from public.tasks where assignee_id is not null and not (assignee_id = any(assignee_ids))')).rows.length,0,'eski sorumlu listeye taşınır');
+
+  // Açıklama boş olabilir; tekrar eden kişi bir kez kalır, ilk kişi assignee_id olur.
+  const id=await create(0,'Diğer Talepler',[ids[2],other,ids[2]]);
+  assert.deepEqual(await read(id),{assignee_id:ids[2],assignee_ids:[ids[2],other],notes:null});
+  await login(0);
+  await assert.rejects(db.query(`insert into public.tasks(title,description,category,brand,creator_id,notes) values('Uzun','Örnek açıklama','Diğer Talepler','İç Ekip',$1,$2)`,[ids[0],'a'.repeat(10001)]));
+  await assert.rejects(db.query(`insert into public.tasks(title,description,category,brand,creator_id,assignee_ids,status) values('Pasif','Örnek açıklama','Diğer Talepler','İç Ekip',$1,$2,'Atandı')`,[ids[0],[ids[3]]]),/aktif/);
+
+  // İki sorumlu da "atandı" bildirimi alır.
+  await db.exec('reset role');
+  for(const who of [ids[2],other])assert.equal((await db.query("select 1 from public.notifications where task_id=$1 and recipient_id=$2 and body='Sana yeni bir talep atandı.'",[id,who])).rows.length,1);
+
+  // İkinci sorumlu da işi ilerletebilir ve açıklamayı düzenleyebilir; listede olmayan çalışan değiştiremez.
+  await login(4);
+  await db.query("update public.tasks set status='İşlemde',progress=30,notes='Ek bilgi' where id=$1",[id]);
+  assert.equal((await read(id)).notes,'Ek bilgi');
+  await db.exec('reset role');
+  await db.query('update public.profiles set active=true where id=$1',[ids[3]]);
+  await login(3);
+  assert.equal((await db.query("update public.tasks set status='Tamamlandı' where id=$1 returning id",[id])).rows.length,0,'ilgisiz çalışan değiştiremez');
+
+  // Yalnızca assignee_id yazan eski istemci listeyi tek kişiye çevirir.
+  await login(0);
+  await db.query('update public.tasks set assignee_id=$2 where id=$1',[id,other]);
+  assert.deepEqual((await read(id)).assignee_ids,[other]);
+  await login(0);
+  await db.query('update public.tasks set assignee_ids=$2 where id=$1',[id,[ids[2],other]]);
+  assert.equal((await db.query<{details:string}>("select details from public.task_events where task_id=$1 and action='Sorumlu değişti' order by created_at desc limit 1",[id])).rows[0].details,'User 2, Başka Çalışan');
+
+  // Bölümde işaretli sorumlu varsa listedeki herkes işaretli olmalı.
+  await db.query('select public.set_department_assignees($1,true,false)',[ids[2]]);
+  await assert.rejects(create(0,'Teknik İşlemler',[ids[2],other]),/aktif sorumluları/);
+  const technical=await create(0,'Teknik İşlemler',[ids[2]]);
+  await assert.rejects(db.query('update public.tasks set assignee_ids=$2 where id=$1',[technical,[ids[2],other]]),/aktif sorumluları/);
+  await db.query('select public.set_department_assignees($1,false,false)',[ids[2]]);
+
+  // Silinen çalışan yalnızca kendi adının olduğu listeden çıkar, diğer sorumlu kalır.
+  await login(0);
+  await db.query('select public.delete_employee($1)',[other]);
+  assert.deepEqual(await read(id),{assignee_id:ids[2],assignee_ids:[ids[2]],notes:'Ek bilgi'});
+ });
  }finally{await db.close()}
 });

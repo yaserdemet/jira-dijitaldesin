@@ -1,7 +1,7 @@
-import { Data } from './domain';
+import { Data, assigneesOf } from './domain';
 import { seed } from './seed';
 const KEY='akis-demo-v1';
-export function readDemo():Data {const raw=localStorage.getItem(KEY);if(!raw)return seed();try{return {events:[],...JSON.parse(raw)}}catch{throw new Error('Deneme verisi okunamadı. Tarayıcı depolamasını kontrol edin.')}}
+export function readDemo():Data {const raw=localStorage.getItem(KEY);if(!raw)return seed();try{const data:Data={events:[],...JSON.parse(raw)};return {...data,tasks:data.tasks.map(t=>({...t,assignee_ids:assigneesOf(t)}))}}catch{throw new Error('Deneme verisi okunamadı. Tarayıcı depolamasını kontrol edin.')}}
 export function saveDemo(data:Data){localStorage.setItem(KEY,JSON.stringify(data))}
 async function db(){return new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('akis-demo-files',1);r.onupgradeneeded=()=>r.result.createObjectStore('files');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
 export async function putDemoFile(id:string,file:File){const d=await db();try{await new Promise<void>((resolve,reject)=>{const tx=d.transaction('files','readwrite');tx.objectStore('files').put(file,id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}finally{d.close()}}

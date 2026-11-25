@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Archive, ArrowLeft, Bell, BookOpen, Check, Compass, Download, FolderOpen, LoaderCircle, LogOut, Menu, Palette, Plus, Search, Settings, Trash2, Wrench } from 'lucide-react';
-import { type Task, canAssignCategory, reportCsv } from '@/lib/domain';
+import { type Task, assigneesOf, canAssignCategory, reportCsv } from '@/lib/domain';
 import { type Notice, type WorkflowState, categoryLabels, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -72,7 +72,7 @@ export default function WorkflowScreen(p: Props) {
   const notices = p.notices.filter(n => n.recipient_id === p.person.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const unread = notices.filter(n => !n.read_at);
   // Profil rozetindeki sayı: bana atanmış, arşivde olmayan ve henüz başlanmamış (Bekliyor) işler.
-  const waiting = p.data.tasks.filter(t => t.assignee_id === p.person.id && !t.archived_at && workflowState(t) === 'Bekliyor').length;
+  const waiting = p.data.tasks.filter(t => assigneesOf(t).includes(p.person.id) && !t.archived_at && workflowState(t) === 'Bekliyor').length;
   async function openNotice(n: Notice) { if (await p.onRead([n.id])) { go('/talep/' + n.task_id + (n.message_id ? '?yorum=' + n.message_id : '')); if (n.message_id) setTimeout(() => document.getElementById('yorum-' + n.message_id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200); } }
   const category = paths[route.split('/')[2]];
   const selected = p.data.tasks.find(t => route === '/talep/' + t.id);
@@ -82,14 +82,14 @@ export default function WorkflowScreen(p: Props) {
   const mine = route === '/islerim', created = route === '/actiklarim', archive = route === '/arsiv', settingsPage = route === '/ayarlar';
   const listing = !!category || mine || created || archive || route === '/talepler' || reports;
   // Raporlar arşivi de kapsar; arşiv sayfası yalnızca arşivi, diğer ekranlar yalnızca açık panoyu gösterir.
-  const inScope = (t: Task) => (!category || t.category === category) && (!mine || t.assignee_id === p.person.id) && (!created || t.creator_id === p.person.id) && (reports || (archive ? !!t.archived_at : !t.archived_at));
+  const inScope = (t: Task) => (!category || t.category === category) && (!mine || assigneesOf(t).includes(p.person.id)) && (!created || t.creator_id === p.person.id) && (reports || (archive ? !!t.archived_at : !t.archived_at));
   const tasks = p.data.tasks.filter(t => inScope(t) && (filter === 'Tümü' || workflowState(t) === filter) && (priority === 'Tümü' || t.priority === priority) && (`${t.title} ${t.brand} ${t.number}`.toLocaleLowerCase('tr').includes(search.toLocaleLowerCase('tr'))) && (!reports || ((!from || t.created_at.slice(0, 10) >= from) && (!to || t.created_at.slice(0, 10) <= to))));
   const titles: Record<string, string> = { '/islerim': 'İşlerim', '/actiklarim': 'Açtıklarım', '/arsiv': 'Arşiv', '/talepler': 'Tüm talepler', '/raporlar': 'Raporlar', '/ekip': 'Ekip', '/kayitlar': 'Denetim kayıtları', '/bildirimler': 'Bildirimler', '/nasil-yapilir': 'Nasıl yapılır', '/ayarlar': 'Ayarlar' };
   const events = [...p.data.events, ...p.data.tasks.filter(t => !p.data.events.some(e => e.task_id === t.id && e.action === 'Talep oluşturuldu')).map(t => ({ id: 'created-' + t.id, task_id: t.id, actor_id: t.creator_id, action: 'Talep oluşturuldu', details: t.title, created_at: t.created_at }))].sort((a, b) => b.created_at.localeCompare(a.created_at));
   function saveCsv() { const url = URL.createObjectURL(new Blob([reportCsv(tasks, p.data.profiles)], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'akis-rapor.csv'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
 
   const counts = Object.fromEntries(workflowStates.map(s => [s, p.data.tasks.filter(t => inScope(t) && workflowState(t) === s).length])) as Record<WorkflowState, number>;
-  const archivedCount = p.data.tasks.filter(t => t.archived_at && (!category || t.category === category) && (!mine || t.assignee_id === p.person.id) && (!created || t.creator_id === p.person.id)).length;
+  const archivedCount = p.data.tasks.filter(t => t.archived_at && (!category || t.category === category) && (!mine || assigneesOf(t).includes(p.person.id)) && (!created || t.creator_id === p.person.id)).length;
   const title = selected ? selected.title : guide ? guide.title : category ? categoryLabels[category] : titles[route] ?? 'Sayfa bulunamadı';
   const subtitle = selected ? `#${selected.number}, ${selected.brand}` : category ? departments.find(d => paths[d.slug] === category)?.desc : subtitles[route];
 
@@ -271,7 +271,7 @@ export default function WorkflowScreen(p: Props) {
             )}
             {!tasks.length
               ? <EmptyState>{archive ? 'Arşiv boş.' : search || priority !== 'Tümü' || filter !== 'Tümü' ? 'Bu filtrelerle eşleşen talep yok. Filtreleri temizlemeyi dene.' : 'Burada henüz talep yok. “Yeni talep” ile ilkini aç.'}</EmptyState>
-              : layout === 'board' && !archive ? <Board tasks={tasks} p={p} open={t => go(taskPath(t))} /> : <TaskList tasks={tasks} profiles={p.data.profiles} open={task => go(taskPath(task))} />}
+              : layout === 'board' && !archive ? <Board tasks={tasks} p={p} open={t => go(taskPath(t))} doneByDay={mine} /> : <TaskList tasks={tasks} profiles={p.data.profiles} open={task => go(taskPath(task))} />}
             {!archive && !reports && (
               <Button variant="ghost" className="mt-6 -ml-2 text-muted-foreground" onClick={() => go('/arsiv')}><Archive /> Arşivi aç ({archivedCount})</Button>
             )}
@@ -381,7 +381,7 @@ function Home({ p, go, unread, noticeRow, events, firstName }: {
   p: Props; go: (path: string) => void; unread: Notice[]; noticeRow: (n: Notice) => React.ReactNode;
   events: { id: string; task_id: string; actor_id: string | null; action: string; details: string; created_at: string }[]; firstName: string;
 }) {
-  const myOpen = p.data.tasks.filter(t => t.assignee_id === p.person.id && !t.archived_at && workflowState(t) !== 'Tamamlandı');
+  const myOpen = p.data.tasks.filter(t => assigneesOf(t).includes(p.person.id) && !t.archived_at && workflowState(t) !== 'Tamamlandı');
   const stuck = myOpen.filter(t => workflowState(t) === 'Sorun Var').length;
   const sentence = myOpen.length === 0
     ? 'Üzerinde açık iş yok.'

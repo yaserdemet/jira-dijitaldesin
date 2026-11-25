@@ -16,11 +16,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { IntegrationCanvas } from './integration-canvas';
 import { designSizes, requestForms } from './request-forms';
-import { priorityTone } from './screen-kit';
+import { AssigneePicker, priorityTone } from './screen-kit';
 import { useFirstVisitTour } from './tour';
 
 export const maxRequestFiles = 10;
-const NONE = '__none';
 
 function FormError({ message, onClear }: { message: string; onClear?: () => void }) {
   if (!message) return null;
@@ -110,7 +109,7 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
   profiles: Profile[]; category: Category; onCategory: (c: Category) => void; busy: boolean; error: string; onClearError: () => void;
   onClose: () => void; onSubmit: (input: TaskInput, files: File[]) => void;
 }) {
-  const [input, setInput] = useState<TaskInput>({ title: '', description: '', category, brand: '', priority: 'Normal', assignee_id: null });
+  const [input, setInput] = useState<TaskInput>({ title: '', description: '', notes: '', category, brand: '', priority: 'Normal', assignee_ids: [] });
   const [files, setFiles] = useState<File[]>([]);
   const [localError, setLocalError] = useState('');
   const [requestTypes, setRequestTypes] = useState<string[]>([]);
@@ -212,6 +211,11 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
               <Input id="task-title" autoFocus required minLength={3} maxLength={180} value={input.title} placeholder={brief.titleExample} onChange={e => setInput({ ...input, title: e.target.value })} />
             </div>
 
+            <div className="grid gap-2">
+              <Label htmlFor="task-notes">Açıklama<span className="font-normal text-muted-foreground"> (isteğe bağlı)</span></Label>
+              <Textarea id="task-notes" maxLength={10000} rows={3} value={input.notes ?? ''} placeholder="İşle ilgili bilinmesi gereken diğer ayrıntılar" onChange={e => setInput({ ...input, notes: e.target.value })} />
+            </div>
+
             {design && (
               <fieldset className="grid gap-2">
                 <legend className="mb-2 text-sm font-medium">Yayın alanı ve ölçüler</legend>
@@ -252,14 +256,13 @@ export function CreateDialog({ profiles, category, onCategory, busy, error, onCl
                 <Input id="task-brand" required maxLength={100} value={input.brand} placeholder="Marka adı ya da İç Ekip" onChange={e => setInput({ ...input, brand: e.target.value })} />
               </div>
               <div className="grid gap-2">
-                <Label>Sorumlu</Label>
-                <Select value={input.assignee_id ?? NONE} onValueChange={v => setInput({ ...input, assignee_id: v === NONE ? null : v })}>
-                  <SelectTrigger aria-label="Sorumlu" className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>Şimdilik atama</SelectItem>
-                    {assignableProfiles(profiles, category).map(p => <SelectItem key={p.id} value={p.id}>{p.name}, {p.team}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="task-assignees">Sorumlular</Label>
+                <AssigneePicker
+                  id="task-assignees" keepOpen emptyLabel="Şimdilik atama"
+                  profiles={assignableProfiles(profiles, category)}
+                  value={input.assignee_ids}
+                  onChange={assignee_ids => setInput({ ...input, assignee_ids })}
+                />
               </div>
             </div>
 

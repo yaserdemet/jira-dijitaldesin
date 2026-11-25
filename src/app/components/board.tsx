@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Archive, MessageSquare, Trash2 } from 'lucide-react';
-import { type Profile, type Task, canEdit, canManage } from '@/lib/domain';
-import { type WorkflowState, categoryLabels, taskProgress, workflowPatch, workflowState, workflowStates } from '@/lib/workflow';
+import { type Profile, type Task, assigneeNames, assigneesOf, canEdit, canManage } from '@/lib/domain';
+import { type WorkflowState, categoryLabels, groupByCompletionDay, taskProgress, workflowPatch, workflowState, workflowStates } from '@/lib/workflow';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -53,7 +53,8 @@ export function StateRail({ counts, filter, onFilter }: { counts: Record<Workflo
   );
 }
 
-export function Board({ tasks, p, open }: { tasks: Task[]; p: Props; open: (t: Task) => void }) {
+/** doneByDay: Tamamlandı sütunu bitiş gününe göre şeritlerle ayrılır (İşlerim sayfası). */
+export function Board({ tasks, p, open, doneByDay }: { tasks: Task[]; p: Props; open: (t: Task) => void; doneByDay?: boolean }) {
   // Küçük hareketler tıklama sayılır; dokunmatikte kısa basılı tutunca sürükleme başlar.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -79,7 +80,7 @@ export function Board({ tasks, p, open }: { tasks: Task[]; p: Props; open: (t: T
       onDragCancel={() => setDragging(null)}
     >
       <div className="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {workflowStates.map(s => <Column key={s} state={s} tasks={tasks.filter(t => workflowState(t) === s)} p={p} open={open} />)}
+        {workflowStates.map(s => <Column key={s} state={s} tasks={tasks.filter(t => workflowState(t) === s)} p={p} open={open} byDay={doneByDay && s === 'Tamamlandı'} />)}
       </div>
       <DragOverlay>
         {dragging && (
@@ -93,7 +94,7 @@ export function Board({ tasks, p, open }: { tasks: Task[]; p: Props; open: (t: T
   );
 }
 
-function Column({ state, tasks, p, open }: { state: WorkflowState; tasks: Task[]; p: Props; open: (t: Task) => void }) {
+function Column({ state, tasks, p, open, byDay }: { state: WorkflowState; tasks: Task[]; p: Props; open: (t: Task) => void; byDay?: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: state });
   const archivable = state === 'Tamamlandı' ? tasks.filter(t => canEdit(t, p.person)) : [];
   return (
@@ -110,9 +111,23 @@ function Column({ state, tasks, p, open }: { state: WorkflowState; tasks: Task[]
         <h2 className="text-[15px] font-semibold">{state}</h2>
         <span className="ml-auto text-sm font-semibold text-muted-foreground tabular-nums">{tasks.length}</span>
       </header>
-      <div className="flex flex-col gap-2">
-        {tasks.map(t => <TaskCard key={t.id} task={t} p={p} open={() => open(t)} />)}
-      </div>
+      {byDay ? (
+        <div className="flex flex-col gap-3">
+          {groupByCompletionDay(tasks).map(day => (
+            <section key={day.key} aria-label={`${day.label}, ${day.tasks.length} iş`} className="flex flex-col gap-2">
+              <h3 className="flex items-center gap-2 rounded-md bg-state-done/12 px-2.5 py-1 text-xs font-semibold text-state-done">
+                <span className="truncate">{day.label}</span>
+                <span className="ml-auto tabular-nums">{day.tasks.length}</span>
+              </h3>
+              {day.tasks.map(t => <TaskCard key={t.id} task={t} p={p} open={() => open(t)} />)}
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {tasks.map(t => <TaskCard key={t.id} task={t} p={p} open={() => open(t)} />)}
+        </div>
+      )}
       {!tasks.length && <p className="px-2 py-8 text-center text-sm text-muted-foreground">Bir kartı buraya sürükle</p>}
       {archivable.length > 0 && (
         <ConfirmAction
@@ -176,7 +191,8 @@ function TaskCard({ task, p, open }: { task: Task; p: Props; open: () => void })
 }
 
 function CardBody({ task: t, p }: { task: Task; p: Props }) {
-  const who = p.data.profiles.find(u => u.id === t.assignee_id);
+  const people = assigneesOf(t).flatMap(id => p.data.profiles.find(u => u.id === id) ?? []);
+  const names = people.map(u => u.name);
   const comments = p.data.messages.filter(m => m.task_id === t.id).length;
   const state = workflowState(t);
   return (
@@ -197,9 +213,17 @@ function CardBody({ task: t, p }: { task: Task; p: Props }) {
             <MessageSquare className="size-3.5" /> {comments}
           </span>
         )}
-        <span className="ml-auto flex min-w-0 items-center gap-1.5">
-          <span className="truncate text-xs text-muted-foreground">{who?.name.split(' ')[0] ?? 'Atanmadı'}</span>
-          <Avatar name={who?.name} size="sm" />
+        <span className="ml-auto flex min-w-0 items-center gap-1.5" title={names.join(', ') || undefined}>
+          <span className="truncate text-xs text-muted-foreground">
+            {names.length ? names[0].split(' ')[0] + (names.length > 1 ? ` +${names.length - 1}` : '') : 'Atanmadı'}
+          </span>
+          {people.length ? (
+            <span className="flex shrink-0 -space-x-1.5">
+              {people.slice(0, 3).map(u => (
+                <span key={u.id} className="rounded-full ring-2 ring-card"><Avatar name={u.name} size="sm" /></span>
+              ))}
+            </span>
+          ) : <Avatar size="sm" />}
         </span>
       </footer>
     </>
@@ -267,7 +291,7 @@ export function TaskList({ tasks, profiles, open }: { tasks: Task[]; profiles: P
               </TableCell>
               <TableCell><StateBadge task={task} /></TableCell>
               <TableCell><ProgressBar task={task} /></TableCell>
-              <TableCell>{profiles.find(profile => profile.id === task.assignee_id)?.name ?? 'Atanmadı'}</TableCell>
+              <TableCell className="whitespace-normal">{assigneeNames(task, profiles).join(', ') || 'Atanmadı'}</TableCell>
               <TableCell><PriorityBadge priority={task.priority} /></TableCell>
             </TableRow>
           ))}

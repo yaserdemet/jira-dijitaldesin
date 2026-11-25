@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     db
       .from('tasks')
       .select('title,brand')
-      .eq('assignee_id', profile.id)
+      .contains('assignee_ids', [profile.id])
       .eq('status', 'Tamamlandı')
       .gte('completed_at', since)
       .order('completed_at'),
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     db
       .from('tasks')
       .select('title,brand')
-      .eq('assignee_id', profile.id)
+      .contains('assignee_ids', [profile.id])
       .in('status', ['İşlemde', 'Onay Bekliyor'])
       .is('archived_at', null)
       .order('updated_at', { ascending: false }),

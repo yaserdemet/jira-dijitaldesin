@@ -1,14 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { Archive, CornerDownRight, Download, FileText, Paperclip, RotateCcw, XCircle } from 'lucide-react';
-import { type Message, type Task, assignableProfiles, canEdit, canManage } from '@/lib/domain';
+import { type Message, type Task, assignableProfiles, assigneeNames, assigneesOf, canEdit, canManage } from '@/lib/domain';
 import { type WorkflowState, canRequestRevision, categoryLabels, taskProgress, workflowPatch, workflowState, workflowStates } from '@/lib/workflow';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Avatar, ConfirmAction, Panel, PriorityBadge, ProgressBar, type Props, StateBadge, formatDate, stateStyle } from './screen-kit';
+import { AssigneePicker, Avatar, ConfirmAction, Panel, PriorityBadge, ProgressBar, type Props, StateBadge, formatDate, stateStyle } from './screen-kit';
 
 const NONE = '__none';
 
@@ -16,8 +16,10 @@ export function TaskDetail({ task: selected, p, go }: { task: Task; p: Props; go
   const profile = (id: string | null) => p.data.profiles.find(u => u.id === id);
   const files = p.data.attachments.filter(a => a.task_id === selected.id);
   const history = p.data.events.filter(e => e.task_id === selected.id);
+  const assignees = assigneesOf(selected);
+  // Bölüm sorumlusu olmaktan çıkmış biri hâlâ atanmışsa listede görünür ki çıkarılabilsin.
   const assignable = [
-    ...p.data.profiles.filter(u => u.id === selected.assignee_id && !assignableProfiles(p.data.profiles, selected.category).includes(u)),
+    ...p.data.profiles.filter(u => assignees.includes(u.id) && !assignableProfiles(p.data.profiles, selected.category).includes(u)),
     ...assignableProfiles(p.data.profiles, selected.category),
   ];
 
@@ -35,10 +37,13 @@ export function TaskDetail({ task: selected, p, go }: { task: Task; p: Props; go
             <StateBadge task={selected} />
             <PriorityBadge priority={selected.priority} />
           </div>
-          <p className="mt-4 max-w-[70ch] text-[15px] leading-relaxed whitespace-pre-wrap">{selected.description}</p>
+          {selected.notes && (
+            <p className="mt-4 max-w-[70ch] text-[15px] leading-relaxed whitespace-pre-wrap">{selected.notes}</p>
+          )}
+          <p className={cn('mt-4 max-w-[70ch] whitespace-pre-wrap', selected.notes ? 'rounded-lg bg-secondary px-3 py-2.5 text-sm leading-relaxed' : 'text-[15px] leading-relaxed')}>{selected.description}</p>
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 border-t pt-4 text-sm sm:grid-cols-4">
             <div><dt className="text-xs text-muted-foreground">Açan</dt><dd className="mt-0.5 font-medium">{profile(selected.creator_id)?.name}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Sorumlu</dt><dd className="mt-0.5 font-medium">{profile(selected.assignee_id)?.name ?? 'Atanmadı'}</dd></div>
+            <div><dt className="text-xs text-muted-foreground">{assignees.length > 1 ? 'Sorumlular' : 'Sorumlu'}</dt><dd className="mt-0.5 font-medium">{assigneeNames(selected, p.data.profiles).join(', ') || 'Atanmadı'}</dd></div>
             <div><dt className="text-xs text-muted-foreground">Bölüm</dt><dd className="mt-0.5 font-medium">{categoryLabels[selected.category]}</dd></div>
             <div><dt className="text-xs text-muted-foreground">Açıldı</dt><dd className="mt-0.5 font-medium">{formatDate(selected.created_at)}</dd></div>
           </dl>
@@ -107,18 +112,13 @@ export function TaskDetail({ task: selected, p, go }: { task: Task; p: Props; go
           {selected.status !== 'İptal' && <StatusForm key={selected.id + '-' + selected.updated_at} task={selected} p={p} />}
           {canEdit(selected, p.person) && (
             <div className="mt-4 grid gap-2">
-              <Label>Sorumlu</Label>
-              <Select
-                disabled={p.busy}
-                value={selected.assignee_id ?? NONE}
-                onValueChange={v => p.onUpdate(selected, { assignee_id: v === NONE ? null : v })}
-              >
-                <SelectTrigger aria-label="İş sorumlusu" className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Atanmadı</SelectItem>
-                  {assignable.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="detail-assignees">Sorumlular</Label>
+              <AssigneePicker
+                id="detail-assignees" emptyLabel="Atanmadı" disabled={p.busy}
+                profiles={assignable}
+                value={assignees}
+                onChange={assignee_ids => p.onUpdate(selected, { assignee_ids })}
+              />
             </div>
           )}
           <p className="mt-4 text-xs text-muted-foreground">{selected.revision_count} revize. Önceki dosyalar silinmez.</p>
@@ -128,7 +128,7 @@ export function TaskDetail({ task: selected, p, go }: { task: Task; p: Props; go
             {selected.archived_at ? canEdit(selected, p.person) && (
               <Button
                 variant="outline" disabled={p.busy}
-                onClick={() => p.onUpdate(selected, selected.status === 'İptal' ? { status: selected.assignee_id ? 'Atandı' : 'Yeni', archived_at: null } : { archived_at: null })}
+                onClick={() => p.onUpdate(selected, selected.status === 'İptal' ? { status: assignees.length ? 'Atandı' : 'Yeni', archived_at: null } : { archived_at: null })}
               >
                 <RotateCcw /> Arşivden çıkar
               </Button>

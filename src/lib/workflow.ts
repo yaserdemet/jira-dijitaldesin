@@ -23,3 +23,34 @@ export function workflowPatch(state: WorkflowState, progress: number, problem: s
 }
 export type Notice={id:string;recipient_id:string;task_id:string;message_id:string|null;body:string;created_at:string;read_at:string|null};
 export type Guide={id:string;title:string;body:string;author_id:string;created_at:string};
+
+export type DayGroup<T> = {key: string; label: string; tasks: T[]};
+
+// Tamamlanan işleri bitiş gününe (tarayıcının yerel saati) göre gruplar; en yeni gün ve en yeni iş üstte.
+// Bitiş zamanı olmayan eski kayıtlar en sonda "Tarihi bilinmiyor" altında toplanır.
+export function groupByCompletionDay<T extends Pick<Task, 'completed_at' | 'updated_at'>>(tasks: T[], now = new Date()): DayGroup<T>[] {
+  const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const today = dayKey(now);
+  const yesterday = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+
+  const sorted = [...tasks].sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? '') || b.updated_at.localeCompare(a.updated_at));
+  const groups: DayGroup<T>[] = [];
+  for (const task of sorted) {
+    const date = task.completed_at ? new Date(task.completed_at) : null;
+    const key = date ? dayKey(date) : 'bilinmiyor';
+    let group = groups.find(g => g.key === key);
+    if (!group) {
+      const label = !date ? 'Tarihi bilinmiyor'
+        : key === today ? 'Bugün'
+        : key === yesterday ? 'Dün'
+        : date.toLocaleDateString('tr-TR', {
+          day: 'numeric', month: 'long', weekday: 'long',
+          ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+        });
+      group = { key, label, tasks: [] };
+      groups.push(group);
+    }
+    group.tasks.push(task);
+  }
+  return groups;
+}
