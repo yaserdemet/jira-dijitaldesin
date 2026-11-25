@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { istanbulDayStart, requestToken, tokenMatches } from '@/lib/daily-summary';
 
 // Zamanlanmış e-posta görevi için salt okunur günlük özet.
-// Yalnızca GUNLUK_OZET_EMAIL ile eşleşen kişinin işlerini döndürür; başlık ve marka dışında alan vermez.
+// Yalnızca GUNLUK_OZET_EMAIL ile eşleşen kişinin işlerini döndürür; yalnızca başlık, marka ve açıklama (notes) alanlarını verir.
 export async function GET(req: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
   const [done, doing] = await Promise.all([
     db
       .from('tasks')
-      .select('title,brand')
+      .select('title,brand,notes')
       .contains('assignee_ids', [profile.id])
       .eq('status', 'Tamamlandı')
       .gte('completed_at', since)
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     // "Yapılıyor" sütunu: İşlemde + Onay Bekliyor (src/lib/workflow.ts).
     db
       .from('tasks')
-      .select('title,brand')
+      .select('title,brand,notes')
       .contains('assignee_ids', [profile.id])
       .in('status', ['İşlemde', 'Onay Bekliyor'])
       .is('archived_at', null)
